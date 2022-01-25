@@ -577,53 +577,120 @@ unparseIdentifier = \case
 -- Sorts --
 -----------
 
--- | <sort> ::= <identifier> | ( <identifier> <sort>+ )
+-- | @\<sort\> ::= \<identifier\> | ( \<identifier\> \<sort\>+ )@
 data Sort
-    = -- | <identifier>
+    = -- | \<identifier\>
       SortIdentifier Identifier
-    | -- | ( <identifier> <sort>+ )
+    | -- | ( \<identifier\> \<sort\>+ )
       SortIdentifiers Identifier (NonEmpty Sort)
     deriving (Show, Read, Eq)
+
+-- | Parse 'Sort'
+parseSort :: Parsec e Text Sort
+parseSort =
+    choice
+        [ SortIdentifier <$> try parseIdentifier
+        , undefined
+        ]
+
+-- | Unparse 'Sort'
+unparseSort :: Sort -> Text
+unparseSort = \case
+    SortIdentifier identifier -> unparseIdentifier identifier
+    SortIdentifiers identifier _ -> undefined
 
 ----------------
 -- Attributes --
 ----------------
 
--- | <attribute_value> ::= <spec_constant> | <symbol> | ( <s_expr>* )
+-- | @\<attribute_value\> ::= \<spec_constant\> | \<symbol\> | ( \<s_expr\>* )@
 data AttributeValue
-    = -- | <spec_constant>
+    = -- | \<spec_constant\>
       AttributeValueSpecConstant SpecConstant
-    | -- | <symbol>
+    | -- | \<symbol\>
       AttributeValueSymbol Symbol
-    | -- | ( <s_expr>* )
+    | -- | ( \<s_expr\>* )
       AttributeValueSExprs [SExpr]
     deriving (Show, Read, Eq)
 
--- | <attribute> ::= <keyword> | <keyword> <attribute_value>
+-- | Parse 'AttributeValue'
+parseAttributeValue :: Parsec e Text AttributeValue
+parseAttributeValue =
+    choice
+        [ AttributeValueSpecConstant <$> try parseSpecConstant
+        , AttributeValueSymbol <$> try parseSymbol
+        , undefined
+        ]
+
+-- | Unparse 'AttributeValue'
+unparseAttributeValue :: AttributeValue -> Text
+unparseAttributeValue = \case
+    AttributeValueSpecConstant specConstant -> unparseSpecConstant specConstant
+    AttributeValueSymbol symbol -> unparseSymbol symbol
+    AttributeValueSExprs _ -> undefined
+
+-- | @\<attribute\> ::= \<keyword\> | \<keyword\> \<attribute_value\>@
 data Attribute
-    = -- | <keyword>
+    = -- | \<keyword\>
       AttributeKeyword Keyword
-    | -- | <keyword> <attribute_value>
+    | -- | \<keyword\> \<attribute_value\>
       AttrbuteKeywordAttributeValue Keyword AttributeValue
     deriving (Show, Read, Eq)
+
+-- | Parse 'Attribute'
+parseAttribute :: Parsec e Text Attribute
+parseAttribute =
+    choice
+        [ AttributeKeyword <$> parseKeyword
+        , undefined
+        ]
+
+-- | Unparse 'Attribute'
+unparseAttribute :: Attribute -> Text
+unparseAttribute = \case
+    AttributeKeyword keyword -> unparseKeyword keyword
+    AttributeKeywordAttributeValue keyword attributeValue -> undefined
 
 -----------
 -- Terms --
 -----------
 
--- | <qual_identifier> ::= <identifier> | ( as <identifier> <sort> )
+-- | @\<qual_identifier\> ::= \<identifier\> | ( as \<identifier\> \<sort\> )@
 data QualIdentifier
-    = -- | <identifier>
+    = -- | \<identifier\>
       QualIdentifier Identifier
-    | -- | ( as <identifier> <sort> )
+    | -- | ( as \<identifier\> \<sort\> )
       QualIdentifierAs Identifier Sort
     deriving (Show, Read, Eq)
 
--- | <var_binding> := ( <symbol> <term> )
+-- | Parse 'QualIdentifier'
+parseQualIdentifier :: Parsec e Text QualIdentifier
+parseQualIdentifier =
+    choice
+        [ QualIdentifier <$> try parseIdentifier
+        , undefined
+        ]
+
+-- | Unparse 'QualIdentifier'
+unparseQualIdentifier :: QualIdentifier -> Text
+unparseQualIdentifier = \case
+    QualIdentifier identifier -> unparseIdentifier identifier
+    QualIdentifierAs identifier sort -> undefined
+
+-- | @\<var_binding\> ::= ( \<symbol\> \<term\> )@
 data VarBinding = VarBinding Symbol Term
     deriving (Show, Read, Eq)
 
--- | <sorted_var> := ( <symbol> <sort> )
+-- | Parse 'VarBinding'
+parseVarBinding :: Parsec e Text VarBinding
+parseVarBinding = undefined
+
+-- | Unparse 'VarBinding'
+unparseVarBinding :: VarBinding -> Text
+unparseVarBinding (VarBinding symbol term) =
+    unwords ["(", unparseSymbol symbol, unparseTerm term, ")"]
+
+-- | @\<sorted_var\> ::= ( \<symbol\> \<sort\> )@
 data SortedVar = SortedVar Symbol Sort
     deriving (Show, Read, Eq)
 
@@ -694,6 +761,13 @@ parseMetaSpecConstant =
         , MetaSpecConstantDecimal <$ string "DECIMAL"
         , MetaSpecConstantString <$ string "STRING"
         ]
+
+-- | Unparse 'MetaSpecConstant'
+unparseMetaSpecConstant :: MetaSpecConstant -> Text
+unparseMetaSpecConstant = \case
+    MetaSpecConstantNumeral -> "NUMERAL"
+    MetaSpecConstantDecimal -> "DECIMAL"
+    MetaSpecConstantString -> "STRING"
 
 {- |
 @
