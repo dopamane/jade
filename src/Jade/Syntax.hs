@@ -1,165 +1,318 @@
 module Jade.Syntax (
     -- ** Tokens
+
+    -- *** Numeral
     Numeral (..),
+    parseNumeral,
+    unparseNumeral,
+
+    -- *** Decimal
     Decimal (..),
+    parseDecimal,
+    unparseDecimal,
+
+    -- *** Hexadecimal
     Hexadecimal (..),
+    parseHexadecimal,
+    unparseHexadecimal,
+
+    -- *** Binary
     Binary (..),
+    parseBinary,
+    unparseBinary,
+
+    -- *** String
     String (..),
+    parseString,
+    unparseString,
+
+    -- *** Symbol
     Symbol (..),
+    parseSymbol,
+    unparseSymbol,
+
+    -- *** Keyword
     Keyword (..),
+    parseKeyword,
+    unparseKeyword,
 
     -- ** S-expressions
+
+    -- *** SpecConstant
     SpecConstant (..),
+    parseSpecConstant,
+    unparseSpecConstant,
+
+    -- *** SExpr
     SExpr (..),
+    parseSExpr,
+    unparseSExpr,
 
     -- ** Identifiers
+
+    -- *** Index
     Index (..),
+    parseIndex,
+    unparseIndex,
+
+    -- *** Identifier
     Identifier (..),
+    parseIdentifier,
+    unparseIdentifier,
 
     -- ** Sorts
     Sort (..),
+    parseSort,
+    unparseSort,
 
     -- ** Attributes
+
+    -- *** AttributeValue
     AttributeValue (..),
+    parseAttributeValue,
+    unparseAttributeValue,
+
+    -- *** Attribute
     Attribute (..),
+    parseAttribute,
+    unparseAttribute,
 
     -- ** Terms
+
+    -- *** QualIdentifier
     QualIdentifier (..),
+    parseQualIdentifier,
+    unparseQualIdentifier,
+
+    -- *** VarBinding
     VarBinding (..),
+    parseVarBinding,
+    unparseVarBinding,
+
+    -- *** SortedVar
     SortedVar (..),
+    parseSortedVar,
+    unparseSortedVar,
+
+    -- *** Pattern
     Pattern (..),
+    parsePattern,
+    unparsePattern,
+
+    -- *** MatchCase
     MatchCase (..),
+    parseMatchCase,
+    unparseMatchCase,
+
+    -- *** Term
     Term (..),
+    parseTerm,
+    unparseTerm,
 
     -- ** Theories
 
     -- *** SortSymbolDecl
     SortSymbolDecl (..),
+    parseSortSymbolDecl,
+    unparseSortSymbolDecl,
 
     -- *** MetaSpecConstant
     MetaSpecConstant (..),
     parseMetaSpecConstant,
+    unparseMetaSpecConstant,
 
     -- *** FunSymbolDecl
     FunSymbolDecl (..),
+    parseFunSymbolDecl,
+    unparseFunSymbolDecl,
 
     -- *** ParFunSymbolDecl
     ParFunSymbolDecl (..),
+    parseParFunSymbolDecl,
+    unparseParFunSymbolDecl,
 
     -- *** TheoryAttribute
     TheoryAttribute (..),
+    parseTheoryAttribute,
+    unparseTheoryAttribute,
 
     -- *** TheoryDecl
     TheoryDecl (..),
+    parseTheoryDecl,
+    unparseTheoryDecl,
 
     -- ** Logics
 
     -- *** LogicAttribute
     LogicAttribute (..),
+    parseLogicAttribute,
+    unparseLogicAttribute,
 
     -- *** Logic
     Logic (..),
+    parseLogic,
+    unparseLogic,
 
     -- ** Info flags
     InfoFlag (..),
+    parseInfoFlag,
+    unparseInfoFlag,
 
     -- ** Command options
 
     -- *** BValue
     BValue (..),
     parseBValue,
+    unparseBValue,
 
     -- *** Option
     Option (..),
+    parseOption,
+    unparseOption,
 
     -- ** Commands
 
     -- *** SortDec
     SortDec (..),
+    parseSortDec,
+    unparseSortDec,
 
     -- *** SelectorDec
     SelectorDec (..),
+    parseSelectorDec,
+    unparseSelectorDec,
 
     -- *** ConstructorDec
     ConstructorDec (..),
+    parseConstructorDec,
+    unparseConstructorDec,
 
     -- *** DatatypeDec
     DatatypeDec (..),
+    parseDatatypeDec,
+    unparseDatatypeDec,
 
     -- *** FunctionDec
     FunctionDec (..),
+    parseFunctionDec,
+    unparseFunctionDec,
 
     -- *** FunctionDef
     FunctionDef (..),
+    parseFunctionDef,
+    unparseFunctionDef,
 
     -- *** PropLiteral
     PropLiteral (..),
+    parsePropLiteral,
+    unparsePropLiteral,
 
     -- *** Command
     Command (..),
+    parseCommand,
+    unparseCommand,
 
     -- *** Script
     Script (..),
+    parseScript,
+    unparseScript,
 
     -- ** Command responses
 
     -- *** ErrorBehavior
     ErrorBehavior (..),
+    parseErrorBehavior,
+    unparseErrorBehavior,
 
     -- *** ReasonUnknown
     ReasonUnknown (..),
+    parseReasonUnknown,
+    unparseReasonUnknown,
 
     -- *** ModelResponse
     ModelResponse (..),
+    parseModelResponse,
+    unparseModelResponse,
 
     -- *** InfoResponse
     InfoResponse (..),
+    parseInfoResponse,
+    unparseInfoResponse,
 
     -- *** ValuationPair
     ValuationPair (..),
+    parseValuationPair,
+    unparseValuationPair,
 
     -- *** TValuationPair
     TValuationPair (..),
+    parseTValuationPair,
+    unparseTValuationPair,
 
     -- *** CheckSatResponse
     CheckSatResponse (..),
     parseCheckSatResponse,
+    unparseCheckSatResponse,
 
     -- *** EchoResponse
     EchoResponse (..),
+    parseEchoResponse,
+    unparseEchoResponse,
 
     -- *** GetAssertionsResponse
     GetAssertionsResponse (..),
+    parseGetAssertionsResponse,
+    unparseGetAssertionsResponse,
 
     -- *** GetAssignmentResponse
     GetAssignmentResponse (..),
+    parseGetAssignmentResponse,
+    unparseGetAssignmentResponse,
 
     -- *** GetInfoResponse
     GetInfoResponse (..),
+    parseGetInfoResponse,
+    unparseGetInfoResponse,
 
     -- *** GetModelResponse
     GetModelResponse (..),
+    parseGetModelResponse,
+    unparseGetModelResponse,
 
     -- *** GetOptionResponse
     GetOptionResponse (..),
+    parseGetOptionResponse,
+    unparseGetOptionResponse,
 
     -- *** GetProofResponse
     GetProofResponse (..),
+    parseGetProofResponse,
+    unparseGetProofResponse,
 
     -- *** GetUnsatAssumptionsResponse
     GetUnsatAssumptionsResponse (..),
+    parseGetUnsatAssumptionsResponse,
+    unparseGetUnsatAssumptionsResponse,
 
     -- *** GetUnsatCoreResponse
     GetUnsatCoreResponse (..),
+    parseGetUnsatCoreResponse,
+    unparseGetUnsatCoreResponse,
 
     -- *** GetValueResponse
     GetValueResponse (..),
+    parseGetValueResponse,
+    unparseGetValueResponse,
 
     -- *** SpecificSuccessResponse
     SpecificSuccessResponse (..),
+    parseSpecificSuccessResponse,
+    unparseSpecificSuccessResponse,
 
     -- *** GeneralResponse
     GeneralResponse (..),
+    parseGeneralResponse,
+    unparseGeneralResponse,
 ) where
 
 import Data.List.NonEmpty (
@@ -169,9 +322,10 @@ import Data.Text (
     Text,
  )
 import Text.Megaparsec (
-    MonadParsec,
+    Parsec,
     Tokens,
     choice,
+    try,
     (<|>),
  )
 import Text.Megaparsec.Char (
@@ -183,102 +337,241 @@ import Prelude hiding (String)
 -- Tokens --
 ------------
 
--- | <numeral> ::= 0 | a non-empty sequence of digits not starting with 0
+-- | @\<numeral\> ::= 0 | a non-empty sequence of digits not starting with 0@
 newtype Numeral = Numeral Integer
     deriving (Show, Read, Eq)
 
--- | <decimal> ::= <numeral>.0*<numeral>
+-- | Parse 'Numeral'
+parseNumeral :: Parsec e Text Numeral
+parseNumeral = undefined
+
+-- | Unparse 'Numeral'
+unparseNumeral :: Numeral -> Text
+unparseNumeral = undefined
+
+-- | @\<decimal\> ::= \<numeral\>.0*\<numeral\>@
 newtype Decimal = Decimal Double
     deriving (Show, Read, Eq)
 
-{- | <hexadecimal> ::= #x followed by a non-empty sequence of digits and
- letters from A to F, capitalized or not
+-- | Parse 'Decimal'
+parseDecimal :: Parsec e Text Decimal
+parseDecimal = undefined
+
+-- | Unparse 'Decimal'
+unparseDecimal :: Decimal -> Text
+unparseDecimal = undefined
+
+{- |
+@
+\<hexadecimal\> ::= #x followed by a non-empty sequence of digits and
+letters from A to F, capitalized or not
+@
 -}
 newtype Hexadecimal = Hexadecimal Integer
     deriving (Show, Read, Eq)
 
--- | <binary> ::= #b followed by a non-empty sequence of 0 and 1 characters
+-- | Parse 'Hexadecimal'
+parseHexadecimal :: Parsec e Text Hexadecimal
+parseHexadecimal = undefined
+
+-- | Unparse 'Hexadecimal'
+unparseHexadecimal :: Hexadecimal -> Text
+unparseHexadecimal = undefined
+
+-- | @\<binary\> ::= #b followed by a non-empty sequence of 0 and 1 characters@
 newtype Binary = Binary Integer
     deriving (Show, Read, Eq)
 
-{- | <string> ::= sequence of whitespace and printable characters in double
- quotes with escape sequence ""
+-- | Parse 'Binary'
+parseBinary :: Parsec e Text Binary
+parseBinary = undefined
+
+-- | Unparse 'Binary'
+unparseBinary :: Binary -> Text
+unparseBinary = undefined
+
+{- |
+@
+\<string\> ::= sequence of whitespace and printable characters in double
+quotes with escape sequence ""
+@
 -}
 newtype String = String Text
     deriving (Show, Read, Eq)
 
-{- | <symbol> ::= <simple_symbol>
-              | a sequence of whitespace and printable characters that starts
-                and ends with | and does not otherwise include | or \
+-- | Parse 'String'
+parseString :: Parsec e Text String
+parseString = undefined
+
+-- | Unparse 'String'
+unparseString :: String -> Text
+unparseString = undefined
+
+{- |
+@
+\<symbol\> ::= \<simple_symbol\>
+           | a sequence of whitespace and printable characters that starts
+             and ends with | and does not otherwise include | or \
+@
 -}
 newtype Symbol = Symbol Text
     deriving (Show, Read, Eq)
 
--- | <keyword> ::= :<simple_symbol>
+-- | Parse 'Symbol'
+parseSymbol :: Parsec e Text Symbol
+parseSymbol = undefined
+
+-- | Unparse 'Symbol'
+unparseSymbol :: Symbol -> Text
+unparseSymbol = undefined
+
+-- | @\<keyword\> ::= :\<simple_symbol\>@
 newtype Keyword = Keyword Text
     deriving (Show, Read, Eq)
+
+-- | Parse 'Keyword'
+parseKeyword :: Parsec e Text Keyword
+parseKeyword = undefined
+
+-- | Unparse 'Keyword'
+unparseKeyword :: Keyword -> Text
+unparseKeyword = undefined
 
 -------------------
 -- S-expressions --
 -------------------
 
-{- | <spec_constant> ::= <numeral>
-                     | <decimal>
-                     | <hexadecimal>
-                     | <binary>
-                     | <string>
+{- |
+@
+\<spec_constant\> ::= \<numeral\>
+                  | \<decimal\>
+                  | \<hexadecimal\>
+                  | \<binary\>
+                  | \<string\>
+@
 -}
 data SpecConstant
-    = -- | <numeral>
+    = -- | \<numeral\>
       SpecConstantNumeral Numeral
-    | -- | <decimal>
+    | -- | \<decimal\>
       SpecConstantDecimal Decimal
-    | -- | <hexadecimal>
+    | -- | \<hexadecimal\>
       SpecConstantHexadecimal Hexadecimal
-    | -- | <binary>
+    | -- | \<binary\>
       SpecConstantBinary Binary
-    | -- | <string>
+    | -- | \<string\>
       SpecConstantString String
     deriving (Show, Read, Eq)
 
-{- | <s_expr> ::= <spec_constant>
-              | <symbol>
-              | <reserved>
-              | <keyword>
-              | ( <s_expr>* )
+-- | Parse 'SpecConstant'
+parseSpecConstant :: Parsec e Text SpecConstant
+parseSpecConstant =
+    choice
+        [ SpecConstantNumeral <$> try parseNumeral
+        , SpecConstantDecimal <$> try parseDecimal
+        , SpecConstantHexadecimal <$> try parseHexadecimal
+        , SpecConstantBinary <$> try parseBinary
+        , SpecConstantString <$> try parseString
+        ]
+
+-- | Unparse 'SpecConstant'
+unparseSpecConstant :: SpecConstant -> Text
+unparseSpecConstant = \case
+    SpecConstantNumeral num -> unparseNumeral num
+    SpecConstantDecimal dec -> unparseDecimal dec
+    SpecConstantHexadecimal hex -> unparseHexadecimal hex
+    SpecConstantBinary bin -> unparseBinary bin
+    SpecConstantString str -> unparseString str
+
+{- |
+@
+\<s_expr\> ::= \<spec_constant\>
+           | \<symbol\>
+           | \<reserved\>
+           | \<keyword\>
+           | ( \<s_expr\>* )
+@
 -}
 data SExpr
-    = -- | <spec_constant>
+    = -- | \<spec_constant\>
       SExprSpecConstant SpecConstant
-    | -- | <symbol>
+    | -- | \<symbol\>
       SExprSymbol Symbol
-    | -- | <reserved>
+    | -- | \<reserved\>
       SExprReserved Text
-    | -- | <keyword>
+    | -- | \<keyword\>
       SExprKeyword Keyword
-    | -- | ( <s_expr>* )
+    | -- | ( \<s_expr\>* )
       SExprs [SExpr]
     deriving (Show, Read, Eq)
+
+-- | Parse 'SExpr'
+parseSExpr :: Parsec e Text SExpr
+parseSExpr =
+    choice
+        [ SExprSpecConstant <$> try parseSpecConstant
+        , SExprSymbol <$> try parseSymbol
+        , SExprReserved <$> try parseReserved
+        , SExprKeyword <$> try parseKeyword
+        , undefined
+        ]
+
+-- | Unparse 'SExpr'
+unparseSExpr :: SExpr -> Text
+unparseSExpr = \case
+    SExprSpecConstant specConstant -> unparseSpecConstant specConstant
+    SExprSymbol symbol -> unparseSymbol symbol
+    SExprReserved reserved -> unparseReserved reserved
+    SExprKeyword keyword -> unparseKeyword keyword
+    SExprs exprs -> unwords ["(", unwords undefined, ")"]
 
 -----------------
 -- Identifiers --
 -----------------
 
--- | <index> ::= <numeral> | <symbol>
+-- | @\<index\> ::= \<numeral\> | \<symbol\>@
 data Index
-    = -- | <numeral>
+    = -- | \<numeral\>
       IndexNumeral Numeral
-    | -- | <symbol>
+    | -- | \<symbol\>
       IndexSymbol Symbol
     deriving (Show, Read, Eq)
 
--- | <identifier> ::= <symbol> | ( _ <symbol> <index>+ )
+-- | Parse 'Index'
+parseIndex :: Parsec e Text Index
+parseIndex =
+    choice
+        [ IndexNumeral <$> try parseNumeral
+        , IndexSymbol <$> try parseSymbol
+        ]
+
+-- | Unparse 'Index'
+unparseIndex :: Index -> Text
+unparseIndex = \case
+    IndexNumeral num -> unparseNumeral num
+    IndexSymbol sym -> unparseSymbol sym
+
+-- | @\<identifier\> ::= \<symbol\> | ( _ \<symbol\> \<index\>+ )@
 data Identifier
-    = -- | <symbol>
+    = -- | \<symbol\>
       IdentifierSymbol Symbol
-    | -- | ( _ <symbol> <index>+ )
+    | -- | ( _ \<symbol\> \<index\>+ )
       IdentifierUnderscore Symbol (NonEmpty Index)
     deriving (Show, Read, Eq)
+
+-- | Parse 'Identifier'
+parseIdentifier :: Parsec e Text Identifier
+parseIdentifier =
+    choice
+        [ IdentifierSymbol <$> try parseSymbol
+        , undefined
+        ]
+
+-- | Unparse 'Identifier'
+unparseIdentifier :: Identifier -> Text
+unparseIdentifier = \case
+    IdentifierSymbol sym -> unparseSymbol sym
+    IdentifierUnderscore _ _ -> undefined
 
 -----------
 -- Sorts --
@@ -394,7 +687,7 @@ data MetaSpecConstant
     deriving (Show, Read, Eq)
 
 -- | Parse 'MetaSpecConstant'
-parseMetaSpecConstant :: MonadParsec e Text m => m MetaSpecConstant
+parseMetaSpecConstant :: Parsec e Text MetaSpecConstant
 parseMetaSpecConstant =
     choice
         [ MetaSpecConstantNumeral <$ string "NUMERAL"
@@ -543,7 +836,7 @@ data BValue = BValue Bool
     deriving (Show, Read, Eq)
 
 -- | Parse 'BValue'
-parseBValue :: MonadParsec e Text m => m BValue
+parseBValue :: Parsec e Text BValue
 parseBValue =
     choice [BValue True <$ string "true", BValue False <$ string "false"]
 
@@ -916,7 +1209,7 @@ data CheckSatResponse
     deriving (Show, Read, Eq)
 
 -- | Parse 'CheckSatResponse'
-parseCheckSatResponse :: MonadParsec e Text m => m CheckSatResponse
+parseCheckSatResponse :: Parsec e Text CheckSatResponse
 parseCheckSatResponse =
     choice
         [ Sat <$ string "sat"
@@ -929,7 +1222,7 @@ newtype EchoResponse = EchoResponse String
     deriving (Show, Read, Eq)
 
 -- | Parse 'EchoResponse'
-parseEchoResponse :: MonadParsec e Text m => m EchoResponse
+parseEchoResponse :: Parsec e Text EchoResponse
 parseEchoResponse = EchoResponse <$> try parseString
 
 -- | @\<get_assertions_response\> ::= ( \<term\>* )@
@@ -937,7 +1230,7 @@ newtype GetAssertionsResponse = GetAssertionsResponse [Term]
     deriving (Show, Read, Eq)
 
 -- | Parse 'GetAssertionsResponse'
-parseGetAssertionsResponse :: MonadParsec e Text m => m GetAssertionsResponse
+parseGetAssertionsResponse :: Parsec e Text GetAssertionsResponse
 parseGetAssertionsResponse = undefined
 
 -- | @\<get_assignment_response\> ::= ( \<t_valuation_pair\>* )@
@@ -945,7 +1238,7 @@ newtype GetAssignmentResponse = GetAssignmentResponse [TValuationPair]
     deriving (Show, Read, Eq)
 
 -- | Parse 'GetAssignmentResponse'
-parseGetAssignmentResponse :: MonadParsec e Text m => m GetAssignmentResponse
+parseGetAssignmentResponse :: Parsec e Text GetAssignmentResponse
 parseGetAssignmentResponse = undefined
 
 -- | @\<get_info_response\> ::= ( \<info_response\>+ )@
@@ -953,7 +1246,7 @@ newtype GetInfoResponse = GetInfoResponse (NonEmpty InfoResponse)
     deriving (Show, Read, Eq)
 
 -- | Parse 'GetInfoResponse'
-parseGetInfoResponse :: MonadParsec e Text m => m GetInfoResponse
+parseGetInfoResponse :: Parsec e Text GetInfoResponse
 parseGetInfoResponse = undefined
 
 -- | @\<get_model_response\> ::= ( \<model_response\>* )@
@@ -961,7 +1254,7 @@ newtype GetModelResponse = GetModelResponse [ModelResponse]
     deriving (Show, Read, Eq)
 
 -- | Parse 'GetModelResponse'
-parseGetModelResponse :: MonadParsec e Text m => m GetModelResponse
+parseGetModelResponse :: Parsec e Text GetModelResponse
 parseGetModelResponse = undefined
 
 -- | @\<get_option_response\> ::= \<attribute_value\>@
@@ -969,7 +1262,7 @@ newtype GetOptionResponse = GetOptionResponse AttributeValue
     deriving (Show, Read, Eq)
 
 -- | Parse 'GetOptionResponse'
-parseGetOptionResponse :: MonadParsec e Text m => m GetOptionResponse
+parseGetOptionResponse :: Parsec e Text GetOptionResponse
 parseGetOptionResponse = GetOptionResponse <$> try parseAttributeValue
 
 -- | @\<get_proof_response\> ::= \<s_expr\>@
@@ -977,7 +1270,7 @@ newtype GetProofResponse = GetProofResponse SExpr
     deriving (Show, Read, Eq)
 
 -- | Parse 'GetProofResponse'
-parseGetProofResponse :: MonadParsec e Text m => m GetProofResponse
+parseGetProofResponse :: Parsec e Text GetProofResponse
 parseGetProofResponse = GetProofResponse <$> try parseSExpr
 
 -- | @\<get_unsat_assumptions_response\> ::= ( \<symbol\>* )@
@@ -985,9 +1278,7 @@ newtype GetUnsatAssumptionsResponse = GetUnsatAssumptionsResponse [Symbol]
     deriving (Show, Read, Eq)
 
 -- | Parse 'GetUnsatAssumptionsResponse'
-parseGetUnsatAssumptionsResponse ::
-    MonadParsec e Text m =>
-    m GetUnsatAssumptionsResponse
+parseGetUnsatAssumptionsResponse :: Parsec e Text GetUnsatAssumptionsResponse
 parseGetUnsatAssumptionsResponse = undefined
 
 -- | @\<get_unsat_core_response\> ::= ( \<symbol\>* )@
@@ -995,7 +1286,7 @@ newtype GetUnsatCoreResponse = GetUnsatCoreResponse [Symbol]
     deriving (Show, Read, Eq)
 
 -- | Parse 'GetUnsatCoreResponse'
-parseGetUnsatCoreResponse :: MonadParsec e Text m => m GetUnsatCoreResponse
+parseGetUnsatCoreResponse :: Parsec e Text GetUnsatCoreResponse
 parseGetUnsatCoreResponse = undefined
 
 -- | @\<get_value_response\> ::= ( \<valuation_pair\>+ )@
@@ -1003,7 +1294,7 @@ newtype GetValueResponse = GetValueResponse (NonEmpty ValuationPair)
     deriving (Show, Read, Eq)
 
 -- | Parse 'GetValueResponse'
-parseGetValueResponse :: MonadParsec e Text m => m GetValueResponse
+parseGetValueResponse :: Parsec e Text GetValueResponse
 parseGetValueResponse = undefined
 
 {- |
@@ -1047,9 +1338,7 @@ data SpecificSuccessResponse
     deriving (Show, Read, Eq)
 
 -- | Parse 'SpecificSuccessResponse'
-parseSpecificSuccessResponse ::
-    MonadParsec e Text m =>
-    m SpecificSuccessResponse
+parseSpecificSuccessResponse :: Parsec e Text SpecificSuccessResponse
 parseSpecificSuccessResponse =
     choice
         [ SpecificSuccessResponseCheckSatResponse <$> try parseCheckSatResponse
@@ -1085,7 +1374,7 @@ data GeneralResponse
     deriving (Show, Read, Eq)
 
 -- | Parse 'GeneralResponse'
-parseGeneralResponse :: MonadParsec e Text m => m GeneralResponse
+parseGeneralResponse :: Parsec e Text GeneralResponse
 parseGeneralResponse =
     choice
         [ GeneralResponseSuccess <$ string "success"
