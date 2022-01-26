@@ -16,8 +16,7 @@ version:            0.1.0.0
 author:             dopamane
 maintainer:         dwc1295@gmail.com
 
--- A copyright notice.
--- copyright:
+copyright:          David Cox 2022
 -- category:
 extra-source-files: CHANGELOG.md
 
