@@ -43,7 +43,7 @@ library
   build-depends: base,
                  process,
                  text,
-                 megaparsec
+                 attoparsec
 
   hs-source-dirs: src
 
