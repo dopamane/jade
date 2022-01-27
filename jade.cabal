@@ -38,8 +38,6 @@ library
   exposed-modules: Jade
 
   other-modules: Jade.Process,
-                 Jade.Command,
-                 Jade.Expression,
                  Jade.Syntax
 
   build-depends: base,
