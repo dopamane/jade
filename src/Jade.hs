@@ -1,3 +1,10 @@
+{-|
+Module      : Jade
+Description : Smt interface
+Copyright   : (c) David Cox 2022
+License     : BSD-3-Clause
+Maintainer  : dwc1295@gmail.com
+-}
 module Jade (
 
   -- * Process
