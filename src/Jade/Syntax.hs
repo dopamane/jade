@@ -327,10 +327,22 @@ module Jade.Syntax (
     unparseGeneralResponse,
 ) where
 
-import Data.Attoparsec.Text (Parser, choice, string)
+import Data.Attoparsec.Text (
+  Parser,
+  char,
+  choice, 
+  hexadecimal,
+  many',
+  string,
+  takeWhile1
+  )
+import Data.Bits ((.|.), shiftL)
+import Data.Char (ord)
 import Data.List.NonEmpty (NonEmpty)
-import Data.Text (Text, unlines, unwords)
-import Prelude hiding (String, unlines, unwords)
+import qualified Data.List.NonEmpty as NE
+import Data.Text (Text)
+import qualified Data.Text as T
+import Prelude hiding (String)
 
 ------------
 -- Tokens --
@@ -383,7 +395,7 @@ newtype Hexadecimal = Hexadecimal Integer
 
 -- | Parse 'Hexadecimal'
 parseHexadecimal :: Parser Hexadecimal
-parseHexadecimal = undefined
+parseHexadecimal = "#x" *> hexadecimal
 
 -- | Unparse 'Hexadecimal'
 unparseHexadecimal :: Hexadecimal -> Text
@@ -395,7 +407,12 @@ newtype Binary = Binary Integer
 
 -- | Parse 'Binary'
 parseBinary :: Parser Binary
-parseBinary = undefined
+parseBinary = "#b" *> binary
+  where
+    binary = foldl' step 0 `fmap` takeWhile1 isBinDigit
+      where
+        isBinDigit c = c == '0' || c == '1'
+        step a c = (a `shiftL` 1) .|. fromIntegral (ord c - 48)
 
 -- | Unparse 'Binary'
 unparseBinary :: Binary -> Text
@@ -669,47 +686,78 @@ unparseQualIdentifier = \case
     QualIdentifier identifier -> unparseIdentifier identifier
     QualIdentifierAs identifier sort -> undefined
 
+
 -- | @\<var_binding\> ::= ( \<symbol\> \<term\> )@
 data VarBinding = VarBinding Symbol Term
     deriving (Show, Read, Eq)
 
 -- | Parse 'VarBinding'
 parseVarBinding :: Parser VarBinding
-parseVarBinding = undefined
+parseVarBinding = do
+  _      <- char '('
+  symbol <- parseSymbol
+  term   <- parseTerm
+  _      <- char ')'
+  return $ VarBinding symbol term
 
 -- | Unparse 'VarBinding'
 unparseVarBinding :: VarBinding -> Text
 unparseVarBinding (VarBinding symbol term) =
-    unwords ["(", unparseSymbol symbol, unparseTerm term, ")"]
+    T.unwords ["(", unparseSymbol symbol, unparseTerm term, ")"]
+
 
 -- | @\<sorted_var\> ::= ( \<symbol\> \<sort\> )@
 data SortedVar = SortedVar Symbol Sort
-    deriving (Show, Read, Eq)
+  deriving (Show, Read, Eq)
 
 -- | Parse 'SortedVar'
 parseSortedVar :: Parser SortedVar
-parseSortedVar = undefined
+parseSortedVar = do
+  _      <- char '('
+  symbol <- parseSymbol
+  sort   <- parseSort
+  _      <- char ')'
+  return $ SortedVar symbol sort
 
 -- | Unparse 'SortedVar'
 unparseSortedVar :: SortedVar -> Text
 unparseSortedVar (SortedVar symbol sort) = 
-  unwords ["(", unparseSymbol symbol, unparseSort sort, ")"]
+  T.unwords ["(", unparseSymbol symbol, unparseSort sort, ")"]
+
 
 -- | \<pattern\> ::= \<symbol\> | ( \<symbol\> \<symbol\>+ )
 data Pattern
-    = -- | \<symbol\>
-      Pattern Symbol
-    | -- | ( \<symbol\> \<symbol\>+ )
-      Patterns Symbol (NonEmpty Symbol)
-    deriving (Show, Read, Eq)
+  = -- | \<symbol\>
+    Pattern Symbol
+  | -- | ( \<symbol\> \<symbol\>+ )
+    Patterns Symbol (NonEmpty Symbol)
+  deriving (Show, Read, Eq)
 
 -- | Parse 'Pattern'
 parsePattern :: Parser Pattern
-parsePattern = undefined
+parsePattern = choice
+  [ Pattern <$> parseSymbol
+  , parsePatterns
+  ]
+  where
+    parsePatterns = do
+      _       <- char '('
+      symbol  <- parseSymbol
+      symbols <- many1' parseSymbol
+      _       <- char ')'
+      return $ Patterns symbol $ NE.fromList symbols
 
 -- | Unparse 'Pattern'
 unparsePattern :: Pattern -> Text
-unparsePattern = undefined
+unparsePattern = \case
+  Pattern  symbol         -> unparseSymbol symbol
+  Patterns symbol symbols -> 
+    T.unwords [ "("
+              , unparseSymbol symbol
+              , (T.unwords . NE.toList . NE.map unparseSymbol) symbols
+              , ")"
+              ]
+
 
 -- | \<match_case\> ::= ( \<pattern\> \<term\> )
 data MatchCase = MatchCase Pattern Term
@@ -717,11 +765,18 @@ data MatchCase = MatchCase Pattern Term
 
 -- | Parse 'MatchCase'
 parseMatchCase :: Parser MatchCase
-parseMatchCase = undefined
+parseMatchCase = do
+  _       <- char '('
+  pattern <- parsePattern
+  term    <- parseTerm
+  _       <- char ')'
+  return $ MatchCase pattern term
 
 -- | Unparse 'MatchCase'
 unparseMatchCase :: MatchCase -> Text
-unparseMatchCase = undefined
+unparseMatchCase (MatchCase pattern term) =
+  T.unwords ["(", unparsePattern pattern, unparseTerm term, ")"]
+
 
 {- |
 @
@@ -784,11 +839,24 @@ data SortSymbolDecl = SortSymbolDecl Identifier Numeral [Attribute]
 
 -- | Parse 'SortSymbolDecl'
 parseSortSymbolDecl :: Parser SortSymbolDecl
-parseSortSymbolDecl = undefined
+parseSortSymbolDecl = do
+  _          <- char '('
+  identifier <- parseIdentifier
+  numeral    <- parseNumeral
+  attributes <- many' parseAttribute
+  _          <- char ')'
+  return $ SortSymbolDecl identifier numeral attributes
 
 -- | Unparse 'SortSymbolDecl'
 unparseSortSymbolDecl :: SortSymbolDecl -> Text
-unparseSortSymbolDecl = undefined
+unparseSortSymbolDecl (SortSymbolDecl identifier numeral attributes) =
+  T.unwords [ "("
+            , unparseIdentifier identifier
+            , unparseNumeral numeral
+            , (T.unwords . map unparseAttribute) attributes
+            , ")"
+            ]
+
 
 -- | @\<meta_spec_constant\> ::= NUMERAL | DECIMAL | STRING@
 data MetaSpecConstant = MetaSpecConstantNumeral -- ^ NUMERAL
@@ -898,23 +966,30 @@ parseTheoryAttribute = undefined
 unparseTheoryAttribute :: TheoryAttribute -> Text
 unparseTheoryAttribute = undefined
 
+
 -- | @\<theory_decl\> ::= ( theory \<symbol\> \<theory_attribute\>+ )@
 data TheoryDecl = TheoryDecl Symbol (NonEmpty TheoryAttribute)
   deriving (Show, Read, Eq)
 
 -- | Parse 'TheoryDecl'
 parseTheoryDecl :: Parser TheoryDecl
-parseTheoryDecl = undefined
+parseTheoryDecl = do
+  _                <- char '('
+  _                <- string "theory"
+  symbol           <- parseSymbol
+  theoryAttributes <- NE.fromList <$> many1' parseTheoryAttribute
+  _                <- char ')'
+  return $ TheoryDecl symbol theoryAttributes
 
 -- | Unparse 'TheoryDecl'
 unparseTheoryDecl :: TheoryDecl -> Text
-unparseTheoryDecl (TheoryDecl symbol _) = 
-  unwords [ "("
-          , "theory"
-          , unparseSymbol symbol
-          , undefined
-          , ")"
-          ]
+unparseTheoryDecl (TheoryDecl symbol theoryAttributes) = T.unwords
+  [ "("
+  , "theory"
+  , unparseSymbol symbol
+  , (T.unwords . NE.toList . NE.map unparseTheoryAttribute) theoryAttributes
+  , ")"
+  ]
 
 ------------
 -- Logics --
@@ -952,6 +1027,7 @@ parseLogicAttribute = undefined
 -- | Unparse 'LogicAttribute'
 unparseLogicAttribute :: LogicAttribute -> Text
 unparseLogicAttribute = undefined
+
 
 -- | @\<logic\> ::= ( logic \<symbol\> \<logic_attribute\>+ )@
 data Logic = Logic Symbol (NonEmpty LogicAttribute)
@@ -1092,54 +1168,68 @@ data Option
 -- | Parse 'Option'
 parseOption :: Parser Option
 parseOption = choice
-  [ OptionDiagnosticOutputChannel   <$> parseString
-  , OptionGlobalDeclarations        <$> parseBValue
-  , OptionInteractiveMode           <$> parseBValue
-  , OptionPrintSuccess              <$> parseBValue
-  , OptionProduceAssertions         <$> parseBValue
-  , OptionProduceAssignments        <$> parseBValue
-  , OptionProduceModels             <$> parseBValue
-  , OptionProduceProofs             <$> parseBValue
-  , OptionProduceUnsatAssumptions   <$> parseBValue
-  , OptionProduceUnsatCores         <$> parseBValue
-  , OptionRandomSeed                <$> parseNumeral
-  , OptionRegularOutputChannel      <$> parseString
-  , OptionReproducibleResourceLimit <$> parseNumeral
-  , OptionVerbosity                 <$> parseNumeral
-  , OptionAttribute                 <$> parseAttribute
+  [ ":diagnostic-output-channel"       *>
+      OptionDiagnosticOutputChannel   <$> parseString
+  , ":global-declarations"             *>
+      OptionGlobalDeclarations        <$> parseBValue
+  , ":interactive-mode"                *>
+      OptionInteractiveMode           <$> parseBValue
+  , ":print-success"                   *>
+      OptionPrintSuccess              <$> parseBValue
+  , ":produce-assertions"              *>
+      OptionProduceAssertions         <$> parseBValue
+  , ":produce-assignments"             *>
+      OptionProduceAssignments        <$> parseBValue
+  , ":produce-models"                  *>
+      OptionProduceModels             <$> parseBValue
+  , ":produce-proofs"                  *>
+      OptionProduceProofs             <$> parseBValue
+  , ":produce-unsat-assumptions"       *>
+      OptionProduceUnsatAssumptions   <$> parseBValue
+  , ":produce-unsat-cores"             *>
+      OptionProduceUnsatCores         <$> parseBValue
+  , ":random-seed"                     *>
+      OptionRandomSeed                <$> parseNumeral
+  , ":regular-output-channel"          *>
+      OptionRegularOutputChannel      <$> parseString
+  , ":reproducible-resource-limit"     *>
+      OptionReproducibleResourceLimit <$> parseNumeral
+  , ":verbosity"                       *>
+      OptionVerbosity                 <$> parseNumeral
+  , OptionAttribute                   <$> parseAttribute
   ]
 
 -- | Unparse 'Option'
 unparseOption :: Option -> Text
 unparseOption = \case
   OptionDiagnosticOutputChannel str ->
-    unwords [":diagnostic-output-channel", unparseString str]
+    T.unwords [":diagnostic-output-channel", unparseString str]
   OptionGlobalDeclarations b ->
-    unwords [":global-declarations", unparseBValue b]
+    T.unwords [":global-declarations", unparseBValue b]
   OptionInteractiveMode b ->
-    unwords [":interactive-mode", unparseBValue b]
+    T.unwords [":interactive-mode", unparseBValue b]
   OptionPrintSuccess b ->
-    unwords [":print-success", unparseBValue b]
+    T.unwords [":print-success", unparseBValue b]
   OptionProduceAssertions b ->
-    unwords [":produce-assertions", unparseBValue b]
+    T.unwords [":produce-assertions", unparseBValue b]
   OptionProduceAssignments b ->
-    unwords [":produce-assignments", unparseBValue b]
+    T.unwords [":produce-assignments", unparseBValue b]
   OptionProduceModels b ->
-    unwords [":produce-models", unparseBValue b]
+    T.unwords [":produce-models", unparseBValue b]
   OptionProduceProofs b ->
-    unwords [":produce-proofs", unparseBValue b]
+    T.unwords [":produce-proofs", unparseBValue b]
   OptionProduceUnsatAssumptions b ->
-    unwords [":produce-unsat-assumptions", unparseBValue b]
+    T.unwords [":produce-unsat-assumptions", unparseBValue b]
   OptionProduceUnsatCores b ->
-    unwords [":produce-unsat-cores", unparseBValue b]
+    T.unwords [":produce-unsat-cores", unparseBValue b]
   OptionRandomSeed n ->
-    unwords [":random-seed", unparseNumeral n]
+    T.unwords [":random-seed", unparseNumeral n]
   OptionRegularOutputChannel str ->
-    unwords [":regular-output-channel", unparseString str]
+    T.unwords [":regular-output-channel", unparseString str]
   OptionReproducibleResourceLimit n ->
-    unwords [":reproducible-resource-limit", unparseNumeral n]
+    T.unwords [":reproducible-resource-limit", unparseNumeral n]
   OptionVerbosity n ->
-    unwords [":verbosity", unparseNumeral n]
+    T.unwords [":verbosity", unparseNumeral n]
   OptionAttribute attribute -> unparseAttribute attribute
 
 --------------
@@ -1152,12 +1242,17 @@ data SortDec = SortDec Symbol Numeral
 
 -- | Parse 'SortDec'
 parseSortDec :: Parser SortDec
-parseSortDec = undefined
+parseSortDec = do
+  _       <- char '('
+  symbol  <- parseSymbol
+  numeral <- parseNumeral
+  _       <- char ')'
+  return $ SortDec symbol numeral
 
 -- | Unparse 'SortDec'
 unparseSortDec :: SortDec -> Text
 unparseSortDec (SortDec symbol numeral) =
-  unwords ["(", unparseSymbol symbol, unparseNumeral numeral, ")"]
+  T.unwords ["(", unparseSymbol symbol, unparseNumeral numeral, ")"]
 
 
 -- | @\<selector_dec\> ::= ( \<symbol\> \<sort\> )@
@@ -1166,12 +1261,17 @@ data SelectorDec = SelectorDec Symbol Sort
 
 -- | Parse 'SelectorDec'
 parseSelectorDec :: Parser SelectorDec
-parseSelectorDec = undefined
+parseSelectorDec = do
+  _      <- char '('
+  symbol <- parseSymbol
+  sort   <- parseSort
+  _      <- char ')'
+  return $ SelectorDec symbol sort
 
 -- | Unparse 'SelectorDec'
 unparseSelectorDec :: SelectorDec -> Text
 unparseSelectorDec (SelectorDec symbol sort) =
-  unwords ["(", unparseSymbol symbol, unparseSort sort, ")"]
+  T.unwords ["(", unparseSymbol symbol, unparseSort sort, ")"]
 
 
 -- | @\<constructor_dec\> ::= ( \<symbol\> \<selector_dec\>* )@
@@ -1215,12 +1315,27 @@ data FunctionDec = FunctionDec Symbol [SortedVar] Sort
 
 -- | Parse 'FunctionDec'
 parseFunctionDec :: Parser FunctionDec
-parseFunctionDec = undefined
+parseFunctionDec = do
+  _          <- char '('
+  symbol     <- parseSymbol
+  _          <- char '('
+  sortedVars <- many' parseSortedVar
+  _          <- char ')'
+  sort       <- parseSort
+  _          <- char ')'
+  return $ FunctionDec symbol sortedVars sort
 
 -- | Unparse 'FunctionDec'
 unparseFunctionDec :: FunctionDec -> Text
-unparseFunctionDec = undefined
-
+unparseFunctionDec (FunctionDec symbol sortedVars sort) = T.unwords
+  [ "("
+  , unparseSymbol symbol
+  , "("
+  , (T.unwords . map unparseSortedVar) sortedVars
+  , ")"
+  , unparseSort sort
+  , ")"
+  ]
 
 -- | @\<function_def\> ::= \<symbol\> ( \<sorted_var\>* ) \<sort\> \<term\>@
 data FunctionDef = FunctionDef Symbol [SortedVar] Sort Term
@@ -1228,17 +1343,24 @@ data FunctionDef = FunctionDef Symbol [SortedVar] Sort Term
 
 -- | Parse 'FunctionDef'
 parseFunctionDef :: Parser FunctionDef
-parseFunctionDef = undefined
+parseFunctionDef = do
+  symbol     <- parseSymbol
+  _          <- char '('
+  sortedVars <- many' parseSortedVar
+  _          <- char ')'
+  sort       <- parseSort
+  term       <- parseTerm
+  return $ FunctionDef symbol sortedVars sort term
 
 unparseFunctionDef :: FunctionDef -> Text
-unparseFunctionDef (FunctionDef symbol _ sort term) =
-  unwords [ unparseSymbol symbol
-          , "("
-          , undefined
-          , ")"
-          , unparseSort sort
-          , unparseTerm term
-          ]
+unparseFunctionDef (FunctionDef symbol sortedVars sort term) = T.unwords 
+  [ unparseSymbol symbol
+  , "("
+  , (T.unwords . map unparseSortedVar) sortedVars
+  , ")"
+  , unparseSort sort
+  , unparseTerm term
+  ]
 
 
 -- | @\<prop_literal\> ::= \<symbol\> | ( not \<symbol\> )@
@@ -1249,16 +1371,23 @@ data PropLiteral = PropLiteralSymbol Symbol    -- ^ \<symbol\>
 -- | Parse 'PropLiteral'
 parsePropLiteral :: Parser PropLiteral
 parsePropLiteral = choice
-  [ PropLiteralSymbol    <$> parseSymbol
-  , undefined
+  [ PropLiteralSymbol <$> parseSymbol
+  , parsePropLiteralNotSymbol
   ]
+  where
+    parsePropLiteralNotSymbol = do
+      _      <- char '('
+      _      <- string "not"
+      symbol <- parseSymbol
+      _      <- char ')'
+      return $ PropLiteralNotSymbol symbol
 
 -- | Unparse 'PropLiteral'
 unparsePropLiteral :: PropLiteral -> Text
 unparsePropLiteral = \case
   PropLiteralSymbol symbol -> unparseSymbol symbol
-  PropLiteralNotSymbol symbol -> 
-    unwords ["(", "not", unparseSymbol symbol, ")"]
+  PropLiteralNotSymbol symbol ->
+    T.unwords ["(", "not", unparseSymbol symbol, ")"]
 
 
 {- |
@@ -1365,17 +1494,18 @@ parseCommand = undefined
 unparseCommand :: Command -> Text
 unparseCommand = undefined
 
+
 -- | @\<script\> ::= \<command\>*@
 newtype Script = Script [Command]
   deriving (Show, Read, Eq)
 
 -- | Parse 'Script'
 parseScript :: Parser Script
-parseScript = undefined
+parseScript = Script <$> many' parseCommand
 
 -- | Unparse 'Script'
 unparseScript :: Script -> Text
-unparseScript (Script commands) = unlines $ map unparseCommand commands
+unparseScript (Script commands) = T.unlines $ map unparseCommand commands
 
 
 -----------------------
@@ -1400,6 +1530,7 @@ unparseErrorBehavior = \case
   ImmediateExit      -> "immediate-exit"
   ContinuedExecution -> "continued-execution"
 
+
 -- | @\<reason-unknown\> ::= memout | incomplete | \<s_expr\>@
 data ReasonUnknown = Memout              -- ^ memout
                    | Incomplete          -- ^ incomplete
@@ -1420,6 +1551,7 @@ unparseReasonUnknown = \case
   Memout              -> "memout"
   Incomplete          -> "incomplete"
   ReasonUnknown sexpr -> unparseSExpr sexpr
+
 
 {- |
 @
@@ -1445,11 +1577,11 @@ parseModelResponse = undefined
 unparseModelResponse :: ModelResponse -> Text
 unparseModelResponse = \case
   ModelResponseDefineFun functionDef ->
-    unwords ["(", "define-fun", unparseFunctionDef functionDef, ")"]
+    T.unwords ["(", "define-fun", unparseFunctionDef functionDef, ")"]
   ModelResponseDefineFunRec functionDef ->
-    unwords ["(", "define-fun-rec", unparseFunctionDef functionDef, ")"]
+    T.unwords ["(", "define-fun-rec", unparseFunctionDef functionDef, ")"]
   ModelResponseDefineFunsRec _ ->
-    unwords [ "("
+    T.unwords [ "("
             , "define-funs-rec"
             , "(", undefined, ")"
             , "(", undefined, ")"
@@ -1487,30 +1619,49 @@ data InfoResponse
 -- | Parse 'InfoResponse'
 parseInfoResponse :: Parser InfoResponse
 parseInfoResponse = choice
-  [ InfoResponseAssertionStackLevels <$> parseNumeral
-  , InfoResponseAuthors              <$> parseString
-  , InfoResponseErrorBehavior        <$> parseErrorBehavior
-  , InfoResponseName                 <$> parseString
-  , InfoResponseReasonUnknown        <$> parseReasonUnknown
-  , InfoResponseVersion              <$> parseString
-  , InfoResponseAttribute            <$> parseAttribute
+  [ parseInfoResponseAssertionStackLevels
+  , parseInfoResponseAuthors
+  , parseInfoResponseErrorBehavior
+  , parseInfoResponseName
+  , parseInfoResponseReasonUnknown
+  , parseInfoResponseVersion
+  , InfoResponseAttribute <$> parseAttribute
   ]
+  where
+    parseInfoResponseAssertionStackLevels = do
+      _ <- string ":assertion-stack-levels"
+      InfoResponseAssertionStackLevels <$> parseNumeral
+    parseInfoResponseAuthors = do
+      _ <- string ":authors"
+      InfoResponseAuthors <$> parseString
+    parseInfoResponseErrorBehavior = do
+      _ <- string ":error-behavior"
+      InfoResponseErrorBehavior <$> parseErrorBehavior
+    parseInfoResponseName = do
+      _ <- string ":name"
+      InfoResponseName <$> parseString
+    parseInfoResponseReasonUnknown = do
+      _ <- string ":reason-unknown"
+      InfoResponseReasonUnknown <$> parseReasonUnknown
+    parseInfoResponseVersion = do
+      _ <- string ":version"
+      InfoResponseVersion <$> parseString
 
 -- | Unparse 'InfoResponse'
 unparseInfoResponse :: InfoResponse -> Text
 unparseInfoResponse = \case
   InfoResponseAssertionStackLevels num ->
-      unwords [":assertion-stack-levels", unparseNumeral num]
+      T.unwords [":assertion-stack-levels", unparseNumeral num]
   InfoResponseAuthors str ->
-      unwords [":authors", unparseString str]
+      T.unwords [":authors", unparseString str]
   InfoResponseErrorBehavior errorBehavior ->
-      unwords [":error-behavior", unparseErrorBehavior errorBehavior]
+      T.unwords [":error-behavior", unparseErrorBehavior errorBehavior]
   InfoResponseName str ->
-      unwords [":name", unparseString str]
+      T.unwords [":name", unparseString str]
   InfoResponseReasonUnknown reasonUnknown ->
-      unwords [":reason-unknown", unparseReasonUnknown reasonUnknown]
+      T.unwords [":reason-unknown", unparseReasonUnknown reasonUnknown]
   InfoResponseVersion str -> 
-      unwords [":version", unparseString str]
+      T.unwords [":version", unparseString str]
   InfoResponseAttribute attribute ->
       unparseAttribute attribute
 
@@ -1521,12 +1672,17 @@ data ValuationPair = ValuationPair Term Term
 
 -- | Parse 'ValuationPair'
 parseValuationPair :: Parser ValuationPair
-parseValuationPair = undefined
+parseValuationPair = do
+  _  <- char '('
+  t1 <- parseTerm
+  t2 <- parseTerm
+  _  <- char ')'
+  return $ ValuationPair t1 t2
 
 -- | Unparse 'ValuationPair'
 unparseValuationPair :: ValuationPair -> Text
 unparseValuationPair (ValuationPair a b) = 
-  unwords ["(", unparseTerm a, unparseTerm b, ")"]
+  T.unwords ["(", unparseTerm a, unparseTerm b, ")"]
 
 
 -- | @\<t_valuation_pair\> ::= ( \<symbol\> \<b_value\> )@
@@ -1535,12 +1691,17 @@ data TValuationPair = TValuationPair Symbol BValue
 
 -- | Parse 'TValuationPair'
 parseTValuationPair :: Parser TValuationPair
-parseTValuationPair = undefined
+parseTValuationPair = do
+  _      <- char '('
+  symbol <- parseSymbol
+  bValue <- parseBValue
+  _      <- char ')'
+  return $ TValuationPair symbol bValue
 
 -- | Unparse 'TValuationPair'
 unparseTValuationPair :: TValuationPair -> Text
 unparseTValuationPair (TValuationPair symbol bValue) = 
-  unwords ["(", unparseSymbol symbol, unparseBValue bValue, ")"]
+  T.unwords ["(", unparseSymbol symbol, unparseBValue bValue, ")"]
 
 
 -- | @\<check_sat_response\> ::= sat | unsat | unknown@
@@ -1589,7 +1750,7 @@ parseGetAssertionsResponse = undefined
 -- | Unparse 'GetAssertionsResponse'
 unparseGetAssertionsResponse :: GetAssertionsResponse -> Text
 unparseGetAssertionsResponse (GetAssertionsResponse terms) =
-  unwords ["(", (unwords . map unparseTerm) terms, ")"]
+  T.unwords ["(", (T.unwords . map unparseTerm) terms, ")"]
 
 
 -- | @\<get_assignment_response\> ::= ( \<t_valuation_pair\>* )@
@@ -1603,7 +1764,7 @@ parseGetAssignmentResponse = undefined
 -- | Unparse 'GetAssignmentResponse'
 unparseGetAssignmentResponse :: GetAssignmentResponse -> Text
 unparseGetAssignmentResponse (GetAssignmentResponse tValuationPairs) =
-  unwords ["(", (unwords . map unparseTValuationPair) tValuationPairs, ")"]
+  T.unwords ["(", (T.unwords . map unparseTValuationPair) tValuationPairs, ")"]
 
 
 -- | @\<get_info_response\> ::= ( \<info_response\>+ )@
@@ -1616,7 +1777,12 @@ parseGetInfoResponse = undefined
 
 -- | Unparse 'GetInfoResponse'
 unparseGetInfoResponse :: GetInfoResponse -> Text
-unparseGetInfoResponse (GetInfoResponse _) = unwords ["(", undefined, ")"] 
+unparseGetInfoResponse (GetInfoResponse infoResponses) = 
+  T.unwords 
+    [ "("
+    , (T.unwords . NE.toList . NE.map unparseInfoResponse) infoResponses
+    , ")"
+    ] 
 
 
 -- | @\<get_model_response\> ::= ( \<model_response\>* )@
@@ -1630,7 +1796,7 @@ parseGetModelResponse = undefined
 -- | Unparse 'GetModelResponse'
 unparseGetModelResponse :: GetModelResponse -> Text
 unparseGetModelResponse (GetModelResponse modelResponses) =
-  unwords ["(", (unwords . map unparseModelResponse) modelResponses, ")"]
+  T.unwords ["(", (T.unwords . map unparseModelResponse) modelResponses, ")"]
 
 
 -- | @\<get_option_response\> ::= \<attribute_value\>@
@@ -1671,7 +1837,7 @@ parseGetUnsatAssumptionsResponse = undefined
 -- | Unparse 'GetUnsatAssumptionsResponse'
 unparseGetUnsatAssumptionsResponse :: GetUnsatAssumptionsResponse -> Text
 unparseGetUnsatAssumptionsResponse (GetUnsatAssumptionsResponse r) =
-  unwords ["(", (unwords . map unparseSymbol) r, ")"]
+  T.unwords ["(", (T.unwords . map unparseSymbol) r, ")"]
 
 
 -- | @\<get_unsat_core_response\> ::= ( \<symbol\>* )@
@@ -1685,7 +1851,7 @@ parseGetUnsatCoreResponse = undefined
 -- | Unparse 'GetUnsatCoreResponse'
 unparseGetUnsatCoreResponse :: GetUnsatCoreResponse -> Text
 unparseGetUnsatCoreResponse (GetUnsatCoreResponse symbols) =
-  unwords ["(", (unwords . map unparseSymbol) symbols, ")"]
+  T.unwords ["(", (T.unwords . map unparseSymbol) symbols, ")"]
 
 
 -- | @\<get_value_response\> ::= ( \<valuation_pair\>+ )@
@@ -1819,4 +1985,4 @@ unparseGeneralResponse = \case
     unparseSpecificSuccessResponse specificSuccessResponse
   GeneralResponseUnsupported -> "unsupported"
   GeneralResponseError str ->
-    unwords ["(", "error", unparseString str, ")"]
+    T.unwords ["(", "error", unparseString str, ")"]
