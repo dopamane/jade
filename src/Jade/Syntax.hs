@@ -576,25 +576,26 @@ unparseIdentifier = \case
 -----------
 
 -- | @\<sort\> ::= \<identifier\> | ( \<identifier\> \<sort\>+ )@
-data Sort
-  = -- | \<identifier\>
-    SortIdentifier Identifier
-  | -- | ( \<identifier\> \<sort\>+ )
-    SortIdentifiers Identifier (NonEmpty Sort)
+data Sort = Sort Identifier [Sort]
   deriving (Show, Read, Eq)
 
 -- | Parse 'Sort'
 parseSort :: Parser Sort
 parseSort = choice
-  [ SortIdentifier <$> parseIdentifier
+  [ Sort <$> parseIdentifier <*> pure []
   , undefined
   ]
 
 -- | Unparse 'Sort'
 unparseSort :: Sort -> Text
 unparseSort = \case
-  SortIdentifier identifier -> unparseIdentifier identifier
-  SortIdentifiers identifier _ -> undefined
+  Sort identifier []    -> unparseIdentifier identifier
+  Sort identifier sorts -> 
+    unwords [ "("
+            , unparseIdentifier identifier
+            , (unwords . map unparseSort) sorts
+            , ")"
+            ]
 
 ----------------
 -- Attributes --
