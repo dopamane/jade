@@ -24,6 +24,7 @@ module Subpar (
 ) where
 
 import Control.Monad (forM)
+import Data.Attoparsec.Text (Result, parseWith)
 import Data.Text (Text)
 import qualified Data.Text    as T
 import qualified Data.Text.IO as TIO
@@ -31,31 +32,20 @@ import qualified Data.Text.IO as TIO
 import Subpar.Process
 import Subpar.Syntax
 
--- | Send 'Command's and receive 'GeneralResponse's
-transmit :: SmtHandle -> [Command] -> IO [GeneralResponse]
+-- | Send 'Command's and receive 'GeneralResponse's.
+transmit :: SmtHandle -> [Command] -> IO [Result GeneralResponse]
 transmit hndl cmds = forM cmds $ \cmd -> do
   send hndl $ unparseCommand cmd
-  parseGeneralResponse <$> recv hndl
+  parseWith (recv hndl) parseGeneralResponse =<< (recv hndl)
 
 -- | Send 'Command's without receiving 'GeneralResponse's.
 transmit_ :: SmtHandle -> [Command] -> IO ()
 transmit_ hndl = mapM_ (send hndl . unparseCommand)
 
--- | Send 'Text' to 'SmtHandle'. See 'transmit' and 'transmit_'.
+-- | Send line of 'Text' to 'SmtHandle'. See 'transmit' and 'transmit_'.
 send :: SmtHandle -> Text -> IO ()
 send hndl = TIO.hPutStrLn (smtIn hndl)
 
--- | Receive 'Text' from 'SmtHandle'. See 'transmit'.
+-- | Receive line of 'Text' from 'SmtHandle'. See 'transmit'.
 recv :: SmtHandle -> IO Text
-recv hndl = T.unlines <$> readResponse 0
-  where
-    readResponse :: Int -> IO [Text]
-    readResponse open = do
-      -- always read at least one line
-      line <- TIO.hGetLine $ smtOut hndl
-      let deltaOpen = T.count "(" line - T.count ")" line
-          totalOpen = open + deltaOpen
-      -- if all parentheses closed, return line
-      if totalOpen == 0
-        then return [line]
-        else (line :) <$> readResponse totalOpen
+recv = TIO.hGetLine . smtOut
