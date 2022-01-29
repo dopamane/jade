@@ -1,13 +1,13 @@
 cabal-version:      2.4
-name:               jade
+name:               subpar
 version:            0.1.0.0
 
-synopsis:           Smt interface
+synopsis:           SMT interface
 
 -- A longer description of the package.
 -- description:
 
-bug-reports:        https://github.com/dopamane/jade/issues
+bug-reports:        https://github.com/dopamane/subpar/issues
 license:            BSD-3-Clause
 author:             dopamane
 maintainer:         dwc1295@gmail.com
@@ -18,9 +18,9 @@ extra-source-files: CHANGELOG.md
 
 source-repository head
     type:     git
-    location: https://github.com/dopamane/jade
+    location: https://github.com/dopamane/subpar
 
-executable jade
+executable subpar
     main-is:          Main.hs
 
     -- Modules included in this executable, other than Main.
@@ -30,7 +30,7 @@ executable jade
     -- other-extensions:
     build-depends:    base >=4.14.1.0,
                       text,
-                      jade,
+                      subpar,
                       megaparsec
     hs-source-dirs:   app
     ghc-options: -Wall
@@ -38,10 +38,10 @@ executable jade
     default-language: Haskell2010
 
 library
-  exposed-modules: Jade
+  exposed-modules: Subpar
 
-  other-modules: Jade.Process,
-                 Jade.Syntax
+  other-modules: Subpar.Process,
+                 Subpar.Syntax
 
   build-depends: base,
                  process,

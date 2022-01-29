@@ -1,14 +1,14 @@
 {-|
-Module      : Jade
-Description : Smt interface
+Module      : Subpar
+Description : SMT interface
 Copyright   : (c) David Cox 2022
 License     : BSD-3-Clause
 Maintainer  : dwc1295@gmail.com
 -}
-module Jade (
+module Subpar (
 
   -- * Process
-  module Jade.Process,
+  module Subpar.Process,
 
   -- * Transmit
   transmit,
@@ -18,8 +18,8 @@ module Jade (
   send,
   recv,
 
-    -- * Syntax
-  module Jade.Syntax
+  -- * Syntax
+  module Subpar.Syntax
 
 ) where
 
@@ -28,8 +28,8 @@ import Data.Text (Text)
 import qualified Data.Text    as T
 import qualified Data.Text.IO as TIO
 
-import Jade.Process
-import Jade.Syntax
+import Subpar.Process
+import Subpar.Syntax
 
 -- | Send 'Command's and receive 'GeneralResponse's
 transmit :: SmtHandle -> [Command] -> IO [GeneralResponse]

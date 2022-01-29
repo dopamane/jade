@@ -1,11 +1,11 @@
 {-|
-Module      : Jade.Syntax
+Module      : Subpar.Syntax
 Description : SMT-LIB version 2.6 syntax
 Copyright   : (c) David Cox 2022
 License     : BSD-3-Clause
 Maintainer  : dwc1295@gmail.com
 -}
-module Jade.Syntax (
+module Subpar.Syntax (
     -- ** Tokens
 
     -- *** Reserved

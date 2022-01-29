@@ -4,7 +4,7 @@ import Data.Text (
     Text,
  )
 import qualified Data.Text.IO as TIO
-import Jade (
+import Subpar (
     --    Attribute (..),
     --    Command (..),
     --    InfoFlag (..),
