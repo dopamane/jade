@@ -345,6 +345,16 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Prelude hiding (String)
 
+-- | Parse whitespace
+spcs :: a -> Parser a
+spcs a = do
+  undefined
+  return a
+
+-- | Parse parenthesis
+par :: Char -> Parser ()
+par p = char p >> spcs () 
+
 ------------
 -- Tokens --
 ------------
@@ -355,7 +365,7 @@ newtype Reserved = Reserved Text
 
 -- | Parse 'Reserved'
 parseReserved :: Parser Reserved
-parseReserved = undefined
+parseReserved = undefined >>= spcs
 
 -- | Unparse 'Reserved'
 unparseReserved :: Reserved -> Text
@@ -367,7 +377,7 @@ newtype Numeral = Numeral Integer
 
 -- | Parse 'Numeral'
 parseNumeral :: Parser Numeral
-parseNumeral = undefined
+parseNumeral = undefined >>= spcs
 
 -- | Unparse 'Numeral'
 unparseNumeral :: Numeral -> Text
@@ -379,7 +389,7 @@ newtype Decimal = Decimal Double
 
 -- | Parse 'Decimal'
 parseDecimal :: Parser Decimal
-parseDecimal = undefined
+parseDecimal = undefined >>= spcs
 
 -- | Unparse 'Decimal'
 unparseDecimal :: Decimal -> Text
@@ -396,7 +406,7 @@ newtype Hexadecimal = Hexadecimal Integer
 
 -- | Parse 'Hexadecimal'
 parseHexadecimal :: Parser Hexadecimal
-parseHexadecimal = "#x" *> hexadecimal
+parseHexadecimal = "#x" *> Hexadecimal `fmap` hexadecimal >>= spcs
 
 -- | Unparse 'Hexadecimal'
 unparseHexadecimal :: Hexadecimal -> Text
@@ -408,9 +418,9 @@ newtype Binary = Binary Integer
 
 -- | Parse 'Binary'
 parseBinary :: Parser Binary
-parseBinary = "#b" *> binary
+parseBinary = "#b" *> Binary `fmap` binary >>= spcs
   where
-    binary = foldl' step 0 `fmap` takeWhile1 isBinDigit
+    binary = T.foldl' step 0 `fmap` takeWhile1 isBinDigit
       where
         isBinDigit c = c == '0' || c == '1'
         step a c = (a `shiftL` 1) .|. fromIntegral (ord c - 48)
@@ -430,7 +440,7 @@ newtype String = String Text
 
 -- | Parse 'String'
 parseString :: Parser String
-parseString = undefined
+parseString = undefined >>= spcs
 
 -- | Unparse 'String'
 unparseString :: String -> Text
@@ -448,11 +458,12 @@ newtype Symbol = Symbol Text
 
 -- | Parse 'Symbol'
 parseSymbol :: Parser Symbol
-parseSymbol = undefined
+parseSymbol = undefined >>= spcs
 
 -- | Unparse 'Symbol'
 unparseSymbol :: Symbol -> Text
 unparseSymbol = undefined
+
 
 -- | @\<keyword\> ::= :\<simple_symbol\>@
 newtype Keyword = Keyword Text
@@ -460,11 +471,12 @@ newtype Keyword = Keyword Text
 
 -- | Parse 'Keyword'
 parseKeyword :: Parser Keyword
-parseKeyword = undefined
+parseKeyword = undefined >>= spcs
 
 -- | Unparse 'Keyword'
 unparseKeyword :: Keyword -> Text
 unparseKeyword = undefined
+
 
 -------------------
 -- S-expressions --
@@ -500,7 +512,7 @@ parseSpecConstant = choice
   , SpecConstantHexadecimal <$> parseHexadecimal
   , SpecConstantBinary      <$> parseBinary
   , SpecConstantString      <$> parseString
-  ]
+  ] >>= spcs
 
 -- | Unparse 'SpecConstant'
 unparseSpecConstant :: SpecConstant -> Text
@@ -510,6 +522,7 @@ unparseSpecConstant = \case
   SpecConstantHexadecimal hex -> unparseHexadecimal hex
   SpecConstantBinary      bin -> unparseBinary      bin
   SpecConstantString      str -> unparseString      str
+
 
 {- |
 @
@@ -534,17 +547,25 @@ parseSExpr = choice
   , SExprSymbol       <$> parseSymbol
   , SExprReserved     <$> parseReserved
   , SExprKeyword      <$> parseKeyword
-  , undefined
-  ]
+  , parseExprs
+  ] >>= spcs
+  where
+    parseExprs = do
+      par '('
+      exprs <- many' parseSExpr
+      par ')'
+      return $ SExprs exprs
 
 -- | Unparse 'SExpr'
 unparseSExpr :: SExpr -> Text
 unparseSExpr = \case
   SExprSpecConstant specConstant -> unparseSpecConstant specConstant
-  SExprSymbol symbol             -> unparseSymbol symbol
-  SExprReserved reserved         -> unparseReserved reserved
-  SExprKeyword keyword           -> unparseKeyword keyword
-  SExprs exprs                   -> T.unwords ["(", T.unwords undefined, ")"]
+  SExprSymbol       symbol       -> unparseSymbol symbol
+  SExprReserved     reserved     -> unparseReserved reserved
+  SExprKeyword      keyword      -> unparseKeyword keyword
+  SExprs            exprs        -> 
+    T.unwords ["(", (T.unwords . map unparseSExpr) exprs, ")"]
+
 
 -----------------
 -- Identifiers --
@@ -560,7 +581,7 @@ parseIndex :: Parser Index
 parseIndex = choice
   [ IndexNumeral <$> parseNumeral
   , IndexSymbol  <$> parseSymbol
-  ]
+  ] >>= spcs
 
 -- | Unparse 'Index'
 unparseIndex :: Index -> Text
@@ -581,14 +602,28 @@ data Identifier
 parseIdentifier :: Parser Identifier
 parseIdentifier = choice
   [ IdentifierSymbol <$> parseSymbol
-  , undefined
-  ]
+  , parseIdentifierUnderscore
+  ] >>= spcs
+  where
+    parseIdentifierUnderscore = do
+      par '('
+      char '_' >> spcs ()
+      symbol  <- parseSymbol
+      indices <- NE.fromList <$> many1' parseIndex
+      par ')'
+      return $ IdentifierUnderscore symbol indices
 
 -- | Unparse 'Identifier'
 unparseIdentifier :: Identifier -> Text
 unparseIdentifier = \case
   IdentifierSymbol sym -> unparseSymbol sym
-  IdentifierUnderscore _ _ -> undefined
+  IdentifierUnderscore symbol indices ->
+    T.unwords [ "("
+              , "_"
+              , unparseSymbol symbol
+              , T.unwords $ unparseIndex <$> NE.toList indices
+              , ")"
+              ]
 
 
 -----------
@@ -604,13 +639,13 @@ parseSort :: Parser Sort
 parseSort = choice
   [ Sort <$> parseIdentifier <*> pure []
   , parseIdentifierSorts
-  ]
+  ] >>= spcs
   where
     parseIdentifierSorts = do
-      _          <- char '('
+      par '('
       identifier <- parseIdentifier
-      sorts      <- many' parseSort
-      _          <- char ')'
+      sorts      <- many1' parseSort
+      par ')'
       return $ Sort identifier sorts
 
 -- | Unparse 'Sort'
@@ -620,7 +655,7 @@ unparseSort = \case
   Sort identifier sorts -> 
     T.unwords [ "("
               , unparseIdentifier identifier
-              , (T.unwords . map unparseSort) sorts
+              , T.unwords $ unparseSort <$> sorts
               , ")"
               ]
 
@@ -642,21 +677,21 @@ parseAttributeValue = choice
   [ AttributeValueSpecConstant <$> parseSpecConstant
   , AttributeValueSymbol       <$> parseSymbol
   , parseAttributeValueSExprs
-  ]
+  ] >>= spcs
   where
     parseAttributeValueSExprs = do
-      _     <- char '('
+      par '('
       exprs <- many' parseSExpr
-      _     <- char ')'
+      par ')'
       return $ AttributeValueSExprs exprs
 
 -- | Unparse 'AttributeValue'
 unparseAttributeValue :: AttributeValue -> Text
 unparseAttributeValue = \case
   AttributeValueSpecConstant specConstant -> unparseSpecConstant specConstant
-  AttributeValueSymbol symbol -> unparseSymbol symbol
-  AttributeValueSExprs exprs ->
-    T.unwords ["(", (T.unwords . map unparseSExpr) exprs, ")"]
+  AttributeValueSymbol       symbol       -> unparseSymbol symbol
+  AttributeValueSExprs       exprs        ->
+    T.unwords ["(", T.unwords $ unparseSExpr <$> exprs, ")"]
 
 
 -- | @\<attribute\> ::= \<keyword\> | \<keyword\> \<attribute_value\>@
@@ -670,9 +705,9 @@ data Attribute
 -- | Parse 'Attribute'
 parseAttribute :: Parser Attribute
 parseAttribute = choice
-  [ AttributeKeyword <$> parseKeyword
+  [ AttributeKeyword               <$> parseKeyword
   , AttributeKeywordAttributeValue <$> parseKeyword <*> parseAttributeValue
-  ]
+  ] >>= spcs -- technically no need for spcs here, but it's consistent.
 
 -- | Unparse 'Attribute'
 unparseAttribute :: Attribute -> Text
@@ -699,20 +734,20 @@ parseQualIdentifier :: Parser QualIdentifier
 parseQualIdentifier = choice
   [ QualIdentifier <$> parseIdentifier
   , parseQualIdentifierAs
-  ]
+  ] >>= spcs
   where
     parseQualIdentifierAs = do
-      _          <- char '('
-      _          <- string "as"
+      par '('
+      string "as" >> spcs ()
       identifier <- parseIdentifier
       sort       <- parseSort
-      _          <- char ')'
+      par ')'
       return $ QualIdentifierAs identifier sort
 
 -- | Unparse 'QualIdentifier'
 unparseQualIdentifier :: QualIdentifier -> Text
 unparseQualIdentifier = \case
-    QualIdentifier identifier -> unparseIdentifier identifier
+    QualIdentifier   identifier      -> unparseIdentifier identifier
     QualIdentifierAs identifier sort -> 
       T.unwords [ "("
                 , "as"
@@ -729,10 +764,10 @@ data VarBinding = VarBinding Symbol Term
 -- | Parse 'VarBinding'
 parseVarBinding :: Parser VarBinding
 parseVarBinding = do
-  _      <- char '('
+  par '('
   symbol <- parseSymbol
   term   <- parseTerm
-  _      <- char ')'
+  par ')'
   return $ VarBinding symbol term
 
 -- | Unparse 'VarBinding'
@@ -748,10 +783,10 @@ data SortedVar = SortedVar Symbol Sort
 -- | Parse 'SortedVar'
 parseSortedVar :: Parser SortedVar
 parseSortedVar = do
-  _      <- char '('
+  par '('
   symbol <- parseSymbol
   sort   <- parseSort
-  _      <- char ')'
+  par ')'
   return $ SortedVar symbol sort
 
 -- | Unparse 'SortedVar'
@@ -776,10 +811,10 @@ parsePattern = choice
   ]
   where
     parsePatterns = do
-      _       <- char '('
+      par '('
       symbol  <- parseSymbol
       symbols <- many1' parseSymbol
-      _       <- char ')'
+      par ')'
       return $ Patterns symbol $ NE.fromList symbols
 
 -- | Unparse 'Pattern'
@@ -789,7 +824,7 @@ unparsePattern = \case
   Patterns symbol symbols -> 
     T.unwords [ "("
               , unparseSymbol symbol
-              , (T.unwords . NE.toList . NE.map unparseSymbol) symbols
+              , T.unwords $ unparseSymbol <$> NE.toList symbols
               , ")"
               ]
 
@@ -801,10 +836,10 @@ data MatchCase = MatchCase Pattern Term
 -- | Parse 'MatchCase'
 parseMatchCase :: Parser MatchCase
 parseMatchCase = do
-  _       <- char '('
+  par '('
   pattern <- parsePattern
   term    <- parseTerm
-  _       <- char ')'
+  par ')'
   return $ MatchCase pattern term
 
 -- | Unparse 'MatchCase'
@@ -849,20 +884,125 @@ parseTerm :: Parser Term
 parseTerm = choice
   [ TermSpecConstant <$> parseSpecConstant
   , TermQualIdentifier <$> parseQualIdentifier
-  , undefined
-  , undefined
-  , undefined
-  , undefined
-  , undefined
-  , undefined
+  , parseTermQualIdentifiers
+  , parseTermLet
+  , parseTermForall
+  , parseTermExists
+  , parseTermMatch
+  , parseTermExclamation
   ]
+  where
+    parseTermQualIdentifiers = do
+      par '('
+      qualIdentifier <- parseQualIdentifier
+      terms          <- NE.fromList <$> many1' parseTerm
+      par ')'
+      return $ TermQualIdentifiers qualIdentifier terms
+    parseTermLet = do
+      par '('
+      "let" *> spcs ()
+      par '('
+      varBindings <- NE.fromList <$> many1' parseVarBinding
+      par ')'
+      term        <- parseTerm
+      par ')'
+      return $ TermLet varBindings term
+    parseTermForall = do
+      par '('
+      "forall" *> spcs ()
+      par '('
+      sortedVars <- NE.fromList <$> many1' parseSortedVar
+      par ')'
+      term       <- parseTerm
+      par ')'
+      return $ TermForall sortedVars term
+    parseTermExists = do
+      par '('
+      "exists" *> spcs ()
+      par '('
+      sortedVars <- NE.fromList <$> many1' parseSortedVar
+      par ')'
+      term       <- parseTerm
+      par ')'
+      return $ TermExists sortedVars term
+    parseTermMatch = do
+      par '('
+      "match" *> spcs ()
+      term       <- parseTerm
+      par '('
+      matchCases <- NE.fromList <$> many1' parseMatchCase
+      par ')'
+      par ')'
+      return $ TermMatch term matchCases
+    parseTermExclamation = do
+      par '('
+      char '!' *> spcs ()
+      term       <- parseTerm
+      attributes <- NE.fromList <$> many1' parseAttribute
+      par ')'
+      return $ TermExclamation term attributes
 
 -- | Unparse 'Term'
 unparseTerm :: Term -> Text
 unparseTerm = \case
   TermSpecConstant specConstant -> unparseSpecConstant specConstant
   TermQualIdentifier qualIdentifier -> unparseQualIdentifier qualIdentifier
-  _ -> undefined
+  TermQualIdentifiers qualIdentifier terms ->
+    T.unwords 
+      [ "("
+      , unparseQualIdentifier qualIdentifier
+      , T.unwords $ unparseTerm <$> NE.toList terms
+      , ")"
+      ]
+  TermLet varBindings term -> 
+    T.unwords 
+      [ "("
+      , "let"
+      , "("
+      , T.unwords $ unparseVarBinding <$> NE.toList varBindings
+      , ")"
+      , unparseTerm term
+      , ")"
+      ]
+  TermForall sortedVars term -> 
+    T.unwords 
+      [ "("
+      , "forall"
+      , "("
+      , T.unwords $ unparseSortedVar <$> NE.toList sortedVars
+      , ")"
+      , unparseTerm term
+      , ")"
+      ]
+  TermExists sortedVars term ->
+    T.unwords
+      [ "("
+      , "exists"
+      , "("
+      , T.unwords $ unparseSortedVar <$> NE.toList sortedVars
+      , ")"
+      , unparseTerm term
+      , ")"
+      ]
+  TermMatch term matchCases ->
+    T.unwords
+      [ "("
+      , "match"
+      , unparseTerm term
+      , "("
+      , T.unwords $ unparseMatchCase <$> NE.toList matchCases
+      , ")"
+      , ")"
+      ]
+  TermExclamation term attributes ->
+    T.unwords
+      [ "("
+      , "!"
+      , unparseTerm term
+      , T.unwords $ unparseAttribute <$> NE.toList attributes
+      , ")"
+      ]
+
 
 --------------
 -- Theories --
@@ -875,11 +1015,11 @@ data SortSymbolDecl = SortSymbolDecl Identifier Numeral [Attribute]
 -- | Parse 'SortSymbolDecl'
 parseSortSymbolDecl :: Parser SortSymbolDecl
 parseSortSymbolDecl = do
-  _          <- char '('
+  par '('
   identifier <- parseIdentifier
   numeral    <- parseNumeral
   attributes <- many' parseAttribute
-  _          <- char ')'
+  par ')'
   return $ SortSymbolDecl identifier numeral attributes
 
 -- | Unparse 'SortSymbolDecl'
@@ -888,7 +1028,7 @@ unparseSortSymbolDecl (SortSymbolDecl identifier numeral attributes) =
   T.unwords [ "("
             , unparseIdentifier identifier
             , unparseNumeral numeral
-            , (T.unwords . map unparseAttribute) attributes
+            , T.unwords $ unparseAttribute <$> attributes
             , ")"
             ]
 
@@ -905,7 +1045,7 @@ parseMetaSpecConstant = choice
   [ MetaSpecConstantNumeral <$ string "NUMERAL"
   , MetaSpecConstantDecimal <$ string "DECIMAL"
   , MetaSpecConstantString  <$ string "STRING"
-  ]
+  ] >>= spcs
 
 -- | Unparse 'MetaSpecConstant'
 unparseMetaSpecConstant :: MetaSpecConstant -> Text
@@ -932,11 +1072,62 @@ data FunSymbolDecl
 
 -- | Parse 'FunSymbolDecl'
 parseFunSymbolDecl :: Parser FunSymbolDecl
-parseFunSymbolDecl = undefined
+parseFunSymbolDecl = choice
+  [ parseFunSymbolDeclSpecConstant
+  , parseFunSymbolDeclMetaSpecConstant
+  , parseFunSymbolDeclIdentifier
+  ]
+  where
+    parseFunSymbolDeclSpecConstant = do
+      par '('
+      specConstant <- parseSpecConstant
+      sort         <- parseSort
+      attributes   <- many' parseAttribute
+      par ')'
+      return $ FunSymbolDeclSpecConstant specConstant sort attributes
+    parseFunSymbolDeclMetaSpecConstant = do
+      par '('
+      metaSpecConstant <- parseMetaSpecConstant
+      sort             <- parseSort
+      attributes       <- many' parseAttribute
+      par ')'
+      return $ FunSymbolDeclMetaSpecConstant metaSpecConstant sort attributes
+    parseFunSymbolDeclIdentifier = do
+      par '('
+      identifier <- parseIdentifier
+      sorts      <- NE.fromList <$> many1' parseSort
+      attributes <- many' parseAttribute
+      par ')'
+      return $ FunSymbolDeclIdentifier identifier sorts attributes
 
 -- | Unparse 'FunSymbolDecl'
 unparseFunSymbolDecl :: FunSymbolDecl -> Text
-unparseFunSymbolDecl = undefined
+unparseFunSymbolDecl = \case
+  FunSymbolDeclSpecConstant specConstant sort attributes ->
+    T.unwords
+      [ "("
+      , unparseSpecConstant specConstant
+      , unparseSort sort
+      , T.unwords $ unparseAttribute <$> attributes
+      , ")"
+      ]
+  FunSymbolDeclMetaSpecConstant metaSpecConstant sort attributes ->
+    T.unwords
+      [ "("
+      , unparseMetaSpecConstant metaSpecConstant
+      , unparseSort sort
+      , T.unwords $ unparseAttribute <$> attributes
+      , ")"
+      ]
+  FunSymbolDeclIdentifier identifier sorts attributes ->
+    T.unwords
+      [ "("
+      , unparseIdentifier identifier
+      , T.unwords $ unparseSort <$> NE.toList sorts
+      , T.unwords $ unparseAttribute <$> attributes
+      , ")"
+      ]
+
 
 {- |
 @
@@ -955,12 +1146,43 @@ data ParFunSymbolDecl
 parseParFunSymbolDecl :: Parser ParFunSymbolDecl
 parseParFunSymbolDecl = choice
   [ ParFunSymbolDeclFunSymbolDecl <$> parseFunSymbolDecl
-  , undefined
+  , parsePar
   ]
+  where
+    parsePar = do
+      par '('
+      "par" *> spcs ()
+      par '('
+      symbols    <- NE.fromList <$> many1' parseSymbol
+      par ')'
+      par '('
+      identifier <- parseIdentifier
+      sorts      <- NE.fromList <$> many1' parseSort
+      attributes <- many' parseAttribute
+      par ')'
+      par ')'
+      return $ Par symbols identifier sorts attributes
 
 -- | Unparse 'ParFunSymbolDecl'
 unparseParFunSymbolDecl :: ParFunSymbolDecl -> Text
-unparseParFunSymbolDecl = undefined
+unparseParFunSymbolDecl = \case
+  ParFunSymbolDeclFunSymbolDecl funSymbolDecl ->
+    unparseFunSymbolDecl funSymbolDecl
+  Par symbols identifier sorts attributes ->
+    T.unwords
+      [ "("
+      , "par"
+      , "("
+      , T.unwords $ unparseSymbol <$> NE.toList symbols
+      , ")"
+      , "("
+      , unparseIdentifier identifier
+      , T.unwords $ unparseSort <$> NE.toList sorts
+      , T.unwords $ unparseAttribute <$> attributes
+      , ")"
+      , ")"
+      ]
+
 
 {- |
 @
@@ -977,29 +1199,89 @@ unparseParFunSymbolDecl = undefined
 data TheoryAttribute
   = -- | :sorts ( \<sort_symbol_decl\>+ )
     TheoryAttributeSorts (NonEmpty SortSymbolDecl)
+
   | -- | :funs ( \<par_fun_symbol_decl\>+ )
     TheoryAttributeFuns (NonEmpty ParFunSymbolDecl)
+
   | -- | :sorts-description \<string\>
     TheoryAttributeSortsDescription String
+
   | -- | :funs-description \<string\>
     TheoryAttributeFunsDescription String
+
   | -- | :defintion \<string\>
     TheoryAttributeDefinition String
+
   | -- | :values \<string\>
     TheoryAttributeValues String
+
   | -- | :notes \<string\>
     TheoryAttributeNotes String
+
   | -- | \<attribute\>
     TheoryAttributeAttribute Attribute
   deriving (Show, Read, Eq)
 
 -- | Parse 'TheoryAttribute'
 parseTheoryAttribute :: Parser TheoryAttribute
-parseTheoryAttribute = undefined
+parseTheoryAttribute = choice
+  [ parseTheoryAttributeSorts
+  , parseTheoryAttributeFuns
+  , parseTheoryAttributeSortsDescription
+  , parseTheoryAttributeFunsDescription
+  , ":definition" *> spcs () >> TheoryAttributeDefinition <$> parseString
+  , ":values"     *> spcs () >> TheoryAttributeValues     <$> parseString
+  , ":notes"      *> spcs () >> TheoryAttributeNotes      <$> parseString
+  , TheoryAttributeAttribute <$> parseAttribute
+  ]
+  where
+    parseTheoryAttributeSorts = do
+      ":sorts" *> spcs ()
+      par '('
+      sortSymbolDecls <- NE.fromList <$> many1' parseSortSymbolDecl
+      par ')'
+      return $ TheoryAttributeSorts sortSymbolDecls
+    parseTheoryAttributeFuns = do
+      ":funs" *> spcs ()
+      par '('
+      parFunSymbolDecls <- NE.fromList <$> many1' parseParFunSymbolDecl
+      par ')'
+      return $ TheoryAttributeFuns parFunSymbolDecls
+    parseTheoryAttributeSortsDescription = do
+      ":sorts-description" *> spcs ()
+      TheoryAttributeSortsDescription <$> parseString
+    parseTheoryAttributeFunsDescription = do
+      ":funs-description" *> spcs ()
+      TheoryAttributeFunsDescription <$> parseString
 
 -- | Unparse 'TheoryAttribute'
 unparseTheoryAttribute :: TheoryAttribute -> Text
-unparseTheoryAttribute = undefined
+unparseTheoryAttribute = \case
+  TheoryAttributeSorts sortSymbolDecls ->
+    T.unwords
+      [ ":sorts"
+      , "("
+      , T.unwords $ unparseSortSymbolDecl <$> NE.toList sortSymbolDecls
+      , ")"
+      ]
+  TheoryAttributeFuns parFunSymbolDecls ->
+    T.unwords
+      [ ":funs"
+      , "("
+      , T.unwords $ unparseParFunSymbolDecl <$> NE.toList parFunSymbolDecls
+      , ")"
+      ]
+  TheoryAttributeSortsDescription str ->
+    T.unwords [":sorts-description", unparseString str]
+  TheoryAttributeFunsDescription str ->
+    T.unwords [":funs-description", unparseString str]
+  TheoryAttributeDefinition str ->
+    T.unwords [":definition", unparseString str]
+  TheoryAttributeValues str ->
+    T.unwords [":values", unparseString str]
+  TheoryAttributeNotes str ->
+    T.unwords [":notes", unparseString str]
+  TheoryAttributeAttribute attribute -> unparseAttribute attribute
 
 
 -- | @\<theory_decl\> ::= ( theory \<symbol\> \<theory_attribute\>+ )@
@@ -1009,11 +1291,11 @@ data TheoryDecl = TheoryDecl Symbol (NonEmpty TheoryAttribute)
 -- | Parse 'TheoryDecl'
 parseTheoryDecl :: Parser TheoryDecl
 parseTheoryDecl = do
-  _                <- char '('
-  _                <- string "theory"
+  par '('
+  "theory" *> spcs ()
   symbol           <- parseSymbol
   theoryAttributes <- NE.fromList <$> many1' parseTheoryAttribute
-  _                <- char ')'
+  par ')'
   return $ TheoryDecl symbol theoryAttributes
 
 -- | Unparse 'TheoryDecl'
@@ -1022,9 +1304,10 @@ unparseTheoryDecl (TheoryDecl symbol theoryAttributes) = T.unwords
   [ "("
   , "theory"
   , unparseSymbol symbol
-  , (T.unwords . NE.toList . NE.map unparseTheoryAttribute) theoryAttributes
+  , T.unwords $ unparseTheoryAttribute <$> NE.toList theoryAttributes
   , ")"
   ]
+
 
 ------------
 -- Logics --
@@ -1043,25 +1326,56 @@ unparseTheoryDecl (TheoryDecl symbol theoryAttributes) = T.unwords
 data LogicAttribute
   = -- | :theories ( \<symbol\>+ )
     LogicAttributeTheories (NonEmpty Symbol)
+
   | -- | :language \<string\>
     LogicAttributeLanguage String
+
   | -- | :extensions \<string\>
     LogicAttributeExtensions String
+
   | -- | :values \<string\>
     LogicAttributeValues String
+
   | -- | :notes \<string\>
     LogicAttributeNotes String
+
   | -- | \<attribute\>
     LogicAttributeAttribute Attribute
   deriving (Show, Read, Eq)
 
 -- | Parse 'LogicAttribute'
 parseLogicAttribute :: Parser LogicAttribute
-parseLogicAttribute = undefined
+parseLogicAttribute = choice
+  [ parseLogicAttributeTheories
+  , ":language"   *> spcs () >> LogicAttributeLanguage   <$> parseString
+  , ":extensions" *> spcs () >> LogicAttributeExtensions <$> parseString
+  , ":values"     *> spcs () >> LogicAttributeValues     <$> parseString
+  , ":notes"      *> spcs () >> LogicAttributeNotes      <$> parseString
+  , LogicAttributeAttribute <$> parseAttribute
+  ]
+  where
+    parseLogicAttributeTheories = do
+      ":theories" *> spcs ()
+      par '('
+      symbols <- NE.fromList <$> many1' parseSymbol
+      par ')'
+      return $ LogicAttributeTheories symbols
 
 -- | Unparse 'LogicAttribute'
 unparseLogicAttribute :: LogicAttribute -> Text
-unparseLogicAttribute = undefined
+unparseLogicAttribute = \case
+  LogicAttributeTheories symbols ->
+    T.unwords
+      [ ":theories"
+      , "("
+      , T.unwords $ unparseSymbol <$> NE.toList symbols
+      , ")"
+      ]
+  LogicAttributeLanguage   str -> T.unwords [":language"  , unparseString str]
+  LogicAttributeExtensions str -> T.unwords [":extensions", unparseString str]
+  LogicAttributeValues     str -> T.unwords [":values"    , unparseString str]
+  LogicAttributeNotes      str -> T.unwords [":notes"     , unparseString str]
+  LogicAttributeAttribute attribute -> unparseAttribute attribute
 
 
 -- | @\<logic\> ::= ( logic \<symbol\> \<logic_attribute\>+ )@
@@ -1070,11 +1384,24 @@ data Logic = Logic Symbol (NonEmpty LogicAttribute)
 
 -- | Parse 'Logic'
 parseLogic :: Parser Logic
-parseLogic = undefined
+parseLogic = do
+  par '('
+  "logic" *> spcs ()
+  symbol          <- parseSymbol
+  logicAttributes <- NE.fromList <$> many1' parseLogicAttribute
+  par ')'
+  return $ Logic symbol logicAttributes
 
 -- | Unparse 'Logic'
 unparseLogic :: Logic -> Text
-unparseLogic = undefined
+unparseLogic (Logic symbol logicAttributes) = T.unwords
+  [ "("
+  , "logic"
+  , unparseSymbol symbol
+  , T.unwords $ unparseLogicAttribute <$> NE.toList logicAttributes
+  , ")"
+  ]
+
 
 ----------------
 -- Info flags --
@@ -1113,7 +1440,7 @@ parseInfoFlag = choice
   , InfoFlagReasonUnknown        <$  string ":reason-unknown"
   , InfoFlagVersion              <$  string ":version"
   , InfoFlagKeyword              <$> parseKeyword
-  ]
+  ] >>= spcs
 
 -- | Unparse 'InfoFlag'
 unparseInfoFlag :: InfoFlag -> Text
@@ -1170,32 +1497,46 @@ unparseBValue (BValue False) = "false"
 data Option
   = -- | :diagnostic-output-channel \<string\>
     OptionDiagnosticOutputChannel String
+
   | -- | :global-declarations \<b_value\>
     OptionGlobalDeclarations BValue
+
   | -- | :interactive-mode \<b_value\>
     OptionInteractiveMode BValue
+
   | -- | :print-success \<b_value\>
     OptionPrintSuccess BValue
+
   | -- | :produce-assertions \<b_value\>
     OptionProduceAssertions BValue
+
   | -- | :produce-assignments \<b_value\>
     OptionProduceAssignments BValue
+
   | -- | :produce-models \<b_value\>
     OptionProduceModels BValue
+
   | -- | :produce-proofs \<b_value\>
     OptionProduceProofs BValue
+
   | -- | :produce-unsat-assumptions \<b_value\>
     OptionProduceUnsatAssumptions BValue
+
   | -- | :produce-unsat-cores \<b_value\>
     OptionProduceUnsatCores BValue
+
   | -- | :random-seed \<numeral\>
     OptionRandomSeed Numeral
+
   | -- | :regular-output-channel \<string\>
     OptionRegularOutputChannel String
+
   | -- | :reproducible-resource-limit \<numeral\>
     OptionReproducibleResourceLimit Numeral
+
   | -- | :verbosity \<numeral\>
     OptionVerbosity Numeral
+
   | -- | \<attribute\>
     OptionAttribute Attribute
   deriving (Show, Read, Eq)
@@ -1204,67 +1545,67 @@ data Option
 parseOption :: Parser Option
 parseOption = choice
   [ ":diagnostic-output-channel"       *>
-      OptionDiagnosticOutputChannel   <$> parseString
+      OptionDiagnosticOutputChannel   `fmap` parseString
   , ":global-declarations"             *>
-      OptionGlobalDeclarations        <$> parseBValue
+      OptionGlobalDeclarations        `fmap` parseBValue
   , ":interactive-mode"                *>
-      OptionInteractiveMode           <$> parseBValue
+      OptionInteractiveMode           `fmap` parseBValue
   , ":print-success"                   *>
-      OptionPrintSuccess              <$> parseBValue
+      OptionPrintSuccess              `fmap` parseBValue
   , ":produce-assertions"              *>
-      OptionProduceAssertions         <$> parseBValue
+      OptionProduceAssertions         `fmap` parseBValue
   , ":produce-assignments"             *>
-      OptionProduceAssignments        <$> parseBValue
+      OptionProduceAssignments        `fmap` parseBValue
   , ":produce-models"                  *>
-      OptionProduceModels             <$> parseBValue
+      OptionProduceModels             `fmap` parseBValue
   , ":produce-proofs"                  *>
-      OptionProduceProofs             <$> parseBValue
+      OptionProduceProofs             `fmap` parseBValue
   , ":produce-unsat-assumptions"       *>
-      OptionProduceUnsatAssumptions   <$> parseBValue
+      OptionProduceUnsatAssumptions   `fmap` parseBValue
   , ":produce-unsat-cores"             *>
-      OptionProduceUnsatCores         <$> parseBValue
+      OptionProduceUnsatCores         `fmap` parseBValue
   , ":random-seed"                     *>
-      OptionRandomSeed                <$> parseNumeral
+      OptionRandomSeed                `fmap` parseNumeral
   , ":regular-output-channel"          *>
-      OptionRegularOutputChannel      <$> parseString
+      OptionRegularOutputChannel      `fmap` parseString
   , ":reproducible-resource-limit"     *>
-      OptionReproducibleResourceLimit <$> parseNumeral
+      OptionReproducibleResourceLimit `fmap` parseNumeral
   , ":verbosity"                       *>
-      OptionVerbosity                 <$> parseNumeral
+      OptionVerbosity                  `fmap` parseNumeral
   , OptionAttribute                   <$> parseAttribute
   ]
 
 -- | Unparse 'Option'
 unparseOption :: Option -> Text
 unparseOption = \case
-  OptionDiagnosticOutputChannel str ->
-    T.unwords [":diagnostic-output-channel", unparseString str]
-  OptionGlobalDeclarations b ->
-    T.unwords [":global-declarations", unparseBValue b]
-  OptionInteractiveMode b ->
-    T.unwords [":interactive-mode", unparseBValue b]
-  OptionPrintSuccess b ->
-    T.unwords [":print-success", unparseBValue b]
-  OptionProduceAssertions b ->
-    T.unwords [":produce-assertions", unparseBValue b]
-  OptionProduceAssignments b ->
-    T.unwords [":produce-assignments", unparseBValue b]
-  OptionProduceModels b ->
-    T.unwords [":produce-models", unparseBValue b]
-  OptionProduceProofs b ->
-    T.unwords [":produce-proofs", unparseBValue b]
-  OptionProduceUnsatAssumptions b ->
-    T.unwords [":produce-unsat-assumptions", unparseBValue b]
-  OptionProduceUnsatCores b ->
-    T.unwords [":produce-unsat-cores", unparseBValue b]
-  OptionRandomSeed n ->
-    T.unwords [":random-seed", unparseNumeral n]
-  OptionRegularOutputChannel str ->
-    T.unwords [":regular-output-channel", unparseString str]
-  OptionReproducibleResourceLimit n ->
-    T.unwords [":reproducible-resource-limit", unparseNumeral n]
-  OptionVerbosity n ->
-    T.unwords [":verbosity", unparseNumeral n]
+  OptionDiagnosticOutputChannel   str ->
+    T.unwords [":diagnostic-output-channel"  , unparseString  str]
+  OptionGlobalDeclarations        b   ->
+    T.unwords [":global-declarations"        , unparseBValue  b  ]
+  OptionInteractiveMode           b   ->
+    T.unwords [":interactive-mode"           , unparseBValue  b  ]
+  OptionPrintSuccess              b   ->
+    T.unwords [":print-success"              , unparseBValue  b  ]
+  OptionProduceAssertions         b   ->
+    T.unwords [":produce-assertions"         , unparseBValue  b  ]
+  OptionProduceAssignments        b   ->
+    T.unwords [":produce-assignments"        , unparseBValue  b  ]
+  OptionProduceModels             b   ->
+    T.unwords [":produce-models"             , unparseBValue  b  ]
+  OptionProduceProofs             b   ->
+    T.unwords [":produce-proofs"             , unparseBValue  b  ]
+  OptionProduceUnsatAssumptions   b   ->
+    T.unwords [":produce-unsat-assumptions"  , unparseBValue  b  ]
+  OptionProduceUnsatCores         b   ->
+    T.unwords [":produce-unsat-cores"        , unparseBValue  b  ]
+  OptionRandomSeed                n   ->
+    T.unwords [":random-seed"                , unparseNumeral n  ]
+  OptionRegularOutputChannel      str ->
+    T.unwords [":regular-output-channel"     , unparseString  str]
+  OptionReproducibleResourceLimit n   ->
+    T.unwords [":reproducible-resource-limit", unparseNumeral n  ]
+  OptionVerbosity                 n   ->
+    T.unwords [":verbosity"                  , unparseNumeral n  ]
   OptionAttribute attribute -> unparseAttribute attribute
 
 --------------
@@ -1278,10 +1619,10 @@ data SortDec = SortDec Symbol Numeral
 -- | Parse 'SortDec'
 parseSortDec :: Parser SortDec
 parseSortDec = do
-  _       <- char '('
+  par '('
   symbol  <- parseSymbol
   numeral <- parseNumeral
-  _       <- char ')'
+  par ')'
   return $ SortDec symbol numeral
 
 -- | Unparse 'SortDec'
@@ -1297,10 +1638,10 @@ data SelectorDec = SelectorDec Symbol Sort
 -- | Parse 'SelectorDec'
 parseSelectorDec :: Parser SelectorDec
 parseSelectorDec = do
-  _      <- char '('
+  par '('
   symbol <- parseSymbol
   sort   <- parseSort
-  _      <- char ')'
+  par ')'
   return $ SelectorDec symbol sort
 
 -- | Unparse 'SelectorDec'
@@ -1315,11 +1656,21 @@ data ConstructorDec = ConstructorDec Symbol [SelectorDec]
 
 -- | Parse 'ConstructorDec'
 parseConstructorDec :: Parser ConstructorDec
-parseConstructorDec = undefined
+parseConstructorDec = do
+  par '('
+  symbol       <- parseSymbol
+  selectorDecs <- many' parseSelectorDec
+  par ')'
+  return $ ConstructorDec symbol selectorDecs
 
 -- | Unparse 'ConstructorDec'
 unparseConstructorDec :: ConstructorDec -> Text
-unparseConstructorDec = undefined
+unparseConstructorDec (ConstructorDec symbol selectorDecs) = T.unwords 
+  [ "("
+  , unparseSymbol symbol
+  , T.unwords $ unparseSelectorDec <$> selectorDecs
+  , ")"
+  ]
 
 
 {- |
@@ -1337,11 +1688,49 @@ data DatatypeDec
 
 -- | Parse 'DatatypeDec'
 parseDatatypeDec :: Parser DatatypeDec
-parseDatatypeDec = undefined
+parseDatatypeDec = choice
+  [ parseDatatypeDec'
+  , parseDatatypeDecPar
+  ]
+  where
+    parseDatatypeDec' = do
+      par '('
+      constructorDecs <- NE.fromList <$> many1' parseConstructorDec
+      par ')'
+      return $ DatatypeDec constructorDecs
+    parseDatatypeDecPar = do
+      par '('
+      "par" *> spcs ()
+      par '('
+      symbols         <- NE.fromList <$> many1' parseSymbol
+      par ')'
+      par '('
+      constructorDecs <- NE.fromList <$> many1' parseConstructorDec
+      par ')'
+      par ')'
+      return $ DatatypeDecPar symbols constructorDecs
 
 -- | Unparse 'DatatypeDec'
 unparseDatatypeDec :: DatatypeDec -> Text
-unparseDatatypeDec = undefined
+unparseDatatypeDec = \case
+  DatatypeDec constructorDecs ->
+    T.unwords 
+      [ "("
+      , T.unwords $ unparseConstructorDec <$> NE.toList constructorDecs
+      , ")"
+      ]
+  DatatypeDecPar symbols constructorDecs ->
+    T.unwords
+      [ "("
+      , "par"
+      , "("
+      , T.unwords $ unparseSymbol <$> NE.toList symbols
+      , ")"
+      , "("
+      , T.unwords $ unparseConstructorDec <$> NE.toList constructorDecs
+      , ")"
+      , ")"
+      ]
 
 
 -- | @\<function_dec\> ::= ( \<symbol\> ( \<sorted_var\>* ) \<sort\> )@
@@ -1351,13 +1740,13 @@ data FunctionDec = FunctionDec Symbol [SortedVar] Sort
 -- | Parse 'FunctionDec'
 parseFunctionDec :: Parser FunctionDec
 parseFunctionDec = do
-  _          <- char '('
+  par '('
   symbol     <- parseSymbol
-  _          <- char '('
+  par '('
   sortedVars <- many' parseSortedVar
-  _          <- char ')'
+  par ')'
   sort       <- parseSort
-  _          <- char ')'
+  par ')'
   return $ FunctionDec symbol sortedVars sort
 
 -- | Unparse 'FunctionDec'
@@ -1371,6 +1760,7 @@ unparseFunctionDec (FunctionDec symbol sortedVars sort) = T.unwords
   , unparseSort sort
   , ")"
   ]
+
 
 -- | @\<function_def\> ::= \<symbol\> ( \<sorted_var\>* ) \<sort\> \<term\>@
 data FunctionDef = FunctionDef Symbol [SortedVar] Sort Term
