@@ -334,6 +334,7 @@ import Data.Attoparsec.Text (
   hexadecimal,
   many',
   many1',
+  skipSpace,
   string,
   takeWhile1
   )
@@ -345,15 +346,9 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Prelude hiding (String)
 
--- | Parse whitespace
-spcs :: a -> Parser a
-spcs a = do
-  undefined
-  return a
-
 -- | Parse parenthesis
 par :: Char -> Parser ()
-par p = char p >> spcs () 
+par p = char p >> skipSpace
 
 ------------
 -- Tokens --
@@ -365,7 +360,7 @@ newtype Reserved = Reserved Text
 
 -- | Parse 'Reserved'
 parseReserved :: Parser Reserved
-parseReserved = undefined >>= spcs
+parseReserved = undefined <* skipSpace
 
 -- | Unparse 'Reserved'
 unparseReserved :: Reserved -> Text
@@ -377,7 +372,7 @@ newtype Numeral = Numeral Integer
 
 -- | Parse 'Numeral'
 parseNumeral :: Parser Numeral
-parseNumeral = undefined >>= spcs
+parseNumeral = undefined <* skipSpace
 
 -- | Unparse 'Numeral'
 unparseNumeral :: Numeral -> Text
@@ -389,7 +384,7 @@ newtype Decimal = Decimal Double
 
 -- | Parse 'Decimal'
 parseDecimal :: Parser Decimal
-parseDecimal = undefined >>= spcs
+parseDecimal = undefined <* skipSpace
 
 -- | Unparse 'Decimal'
 unparseDecimal :: Decimal -> Text
@@ -406,7 +401,7 @@ newtype Hexadecimal = Hexadecimal Integer
 
 -- | Parse 'Hexadecimal'
 parseHexadecimal :: Parser Hexadecimal
-parseHexadecimal = "#x" *> Hexadecimal `fmap` hexadecimal >>= spcs
+parseHexadecimal = "#x" *> Hexadecimal `fmap` hexadecimal <* skipSpace
 
 -- | Unparse 'Hexadecimal'
 unparseHexadecimal :: Hexadecimal -> Text
@@ -418,7 +413,7 @@ newtype Binary = Binary Integer
 
 -- | Parse 'Binary'
 parseBinary :: Parser Binary
-parseBinary = "#b" *> Binary `fmap` binary >>= spcs
+parseBinary = "#b" *> Binary `fmap` binary <* skipSpace
   where
     binary = T.foldl' step 0 `fmap` takeWhile1 isBinDigit
       where
@@ -440,7 +435,7 @@ newtype String = String Text
 
 -- | Parse 'String'
 parseString :: Parser String
-parseString = undefined >>= spcs
+parseString = undefined <* skipSpace
 
 -- | Unparse 'String'
 unparseString :: String -> Text
@@ -458,7 +453,7 @@ newtype Symbol = Symbol Text
 
 -- | Parse 'Symbol'
 parseSymbol :: Parser Symbol
-parseSymbol = undefined >>= spcs
+parseSymbol = undefined <* skipSpace
 
 -- | Unparse 'Symbol'
 unparseSymbol :: Symbol -> Text
@@ -471,7 +466,7 @@ newtype Keyword = Keyword Text
 
 -- | Parse 'Keyword'
 parseKeyword :: Parser Keyword
-parseKeyword = undefined >>= spcs
+parseKeyword = undefined <* skipSpace
 
 -- | Unparse 'Keyword'
 unparseKeyword :: Keyword -> Text
@@ -512,7 +507,7 @@ parseSpecConstant = choice
   , SpecConstantHexadecimal <$> parseHexadecimal
   , SpecConstantBinary      <$> parseBinary
   , SpecConstantString      <$> parseString
-  ] >>= spcs
+  ]
 
 -- | Unparse 'SpecConstant'
 unparseSpecConstant :: SpecConstant -> Text
@@ -548,7 +543,7 @@ parseSExpr = choice
   , SExprReserved     <$> parseReserved
   , SExprKeyword      <$> parseKeyword
   , parseExprs
-  ] >>= spcs
+  ]
   where
     parseExprs = do
       par '('
@@ -581,7 +576,7 @@ parseIndex :: Parser Index
 parseIndex = choice
   [ IndexNumeral <$> parseNumeral
   , IndexSymbol  <$> parseSymbol
-  ] >>= spcs
+  ]
 
 -- | Unparse 'Index'
 unparseIndex :: Index -> Text
@@ -603,11 +598,11 @@ parseIdentifier :: Parser Identifier
 parseIdentifier = choice
   [ IdentifierSymbol <$> parseSymbol
   , parseIdentifierUnderscore
-  ] >>= spcs
+  ]
   where
     parseIdentifierUnderscore = do
       par '('
-      char '_' >> spcs ()
+      char '_' >> skipSpace
       symbol  <- parseSymbol
       indices <- NE.fromList <$> many1' parseIndex
       par ')'
@@ -639,7 +634,7 @@ parseSort :: Parser Sort
 parseSort = choice
   [ Sort <$> parseIdentifier <*> pure []
   , parseIdentifierSorts
-  ] >>= spcs
+  ]
   where
     parseIdentifierSorts = do
       par '('
@@ -677,7 +672,7 @@ parseAttributeValue = choice
   [ AttributeValueSpecConstant <$> parseSpecConstant
   , AttributeValueSymbol       <$> parseSymbol
   , parseAttributeValueSExprs
-  ] >>= spcs
+  ]
   where
     parseAttributeValueSExprs = do
       par '('
@@ -707,7 +702,7 @@ parseAttribute :: Parser Attribute
 parseAttribute = choice
   [ AttributeKeyword               <$> parseKeyword
   , AttributeKeywordAttributeValue <$> parseKeyword <*> parseAttributeValue
-  ] >>= spcs -- technically no need for spcs here, but it's consistent.
+  ]
 
 -- | Unparse 'Attribute'
 unparseAttribute :: Attribute -> Text
@@ -734,11 +729,11 @@ parseQualIdentifier :: Parser QualIdentifier
 parseQualIdentifier = choice
   [ QualIdentifier <$> parseIdentifier
   , parseQualIdentifierAs
-  ] >>= spcs
+  ]
   where
     parseQualIdentifierAs = do
       par '('
-      string "as" >> spcs ()
+      string "as" >> skipSpace
       identifier <- parseIdentifier
       sort       <- parseSort
       par ')'
@@ -900,7 +895,7 @@ parseTerm = choice
       return $ TermQualIdentifiers qualIdentifier terms
     parseTermLet = do
       par '('
-      "let" *> spcs ()
+      "let" *> skipSpace
       par '('
       varBindings <- NE.fromList <$> many1' parseVarBinding
       par ')'
@@ -909,7 +904,7 @@ parseTerm = choice
       return $ TermLet varBindings term
     parseTermForall = do
       par '('
-      "forall" *> spcs ()
+      "forall" *> skipSpace
       par '('
       sortedVars <- NE.fromList <$> many1' parseSortedVar
       par ')'
@@ -918,7 +913,7 @@ parseTerm = choice
       return $ TermForall sortedVars term
     parseTermExists = do
       par '('
-      "exists" *> spcs ()
+      "exists" *> skipSpace
       par '('
       sortedVars <- NE.fromList <$> many1' parseSortedVar
       par ')'
@@ -927,7 +922,7 @@ parseTerm = choice
       return $ TermExists sortedVars term
     parseTermMatch = do
       par '('
-      "match" *> spcs ()
+      "match" *> skipSpace
       term       <- parseTerm
       par '('
       matchCases <- NE.fromList <$> many1' parseMatchCase
@@ -936,7 +931,7 @@ parseTerm = choice
       return $ TermMatch term matchCases
     parseTermExclamation = do
       par '('
-      char '!' *> spcs ()
+      char '!' *> skipSpace
       term       <- parseTerm
       attributes <- NE.fromList <$> many1' parseAttribute
       par ')'
@@ -1045,7 +1040,7 @@ parseMetaSpecConstant = choice
   [ MetaSpecConstantNumeral <$ string "NUMERAL"
   , MetaSpecConstantDecimal <$ string "DECIMAL"
   , MetaSpecConstantString  <$ string "STRING"
-  ] >>= spcs
+  ] <* skipSpace
 
 -- | Unparse 'MetaSpecConstant'
 unparseMetaSpecConstant :: MetaSpecConstant -> Text
@@ -1151,7 +1146,7 @@ parseParFunSymbolDecl = choice
   where
     parsePar = do
       par '('
-      "par" *> spcs ()
+      "par" *> skipSpace
       par '('
       symbols    <- NE.fromList <$> many1' parseSymbol
       par ')'
@@ -1229,29 +1224,29 @@ parseTheoryAttribute = choice
   , parseTheoryAttributeFuns
   , parseTheoryAttributeSortsDescription
   , parseTheoryAttributeFunsDescription
-  , ":definition" *> spcs () >> TheoryAttributeDefinition <$> parseString
-  , ":values"     *> spcs () >> TheoryAttributeValues     <$> parseString
-  , ":notes"      *> spcs () >> TheoryAttributeNotes      <$> parseString
+  , ":definition" *> skipSpace >> TheoryAttributeDefinition <$> parseString
+  , ":values"     *> skipSpace >> TheoryAttributeValues     <$> parseString
+  , ":notes"      *> skipSpace >> TheoryAttributeNotes      <$> parseString
   , TheoryAttributeAttribute <$> parseAttribute
   ]
   where
     parseTheoryAttributeSorts = do
-      ":sorts" *> spcs ()
+      ":sorts" *> skipSpace
       par '('
       sortSymbolDecls <- NE.fromList <$> many1' parseSortSymbolDecl
       par ')'
       return $ TheoryAttributeSorts sortSymbolDecls
     parseTheoryAttributeFuns = do
-      ":funs" *> spcs ()
+      ":funs" *> skipSpace
       par '('
       parFunSymbolDecls <- NE.fromList <$> many1' parseParFunSymbolDecl
       par ')'
       return $ TheoryAttributeFuns parFunSymbolDecls
     parseTheoryAttributeSortsDescription = do
-      ":sorts-description" *> spcs ()
+      ":sorts-description" *> skipSpace
       TheoryAttributeSortsDescription <$> parseString
     parseTheoryAttributeFunsDescription = do
-      ":funs-description" *> spcs ()
+      ":funs-description" *> skipSpace
       TheoryAttributeFunsDescription <$> parseString
 
 -- | Unparse 'TheoryAttribute'
@@ -1292,7 +1287,7 @@ data TheoryDecl = TheoryDecl Symbol (NonEmpty TheoryAttribute)
 parseTheoryDecl :: Parser TheoryDecl
 parseTheoryDecl = do
   par '('
-  "theory" *> spcs ()
+  "theory" *> skipSpace
   symbol           <- parseSymbol
   theoryAttributes <- NE.fromList <$> many1' parseTheoryAttribute
   par ')'
@@ -1347,15 +1342,15 @@ data LogicAttribute
 parseLogicAttribute :: Parser LogicAttribute
 parseLogicAttribute = choice
   [ parseLogicAttributeTheories
-  , ":language"   *> spcs () >> LogicAttributeLanguage   <$> parseString
-  , ":extensions" *> spcs () >> LogicAttributeExtensions <$> parseString
-  , ":values"     *> spcs () >> LogicAttributeValues     <$> parseString
-  , ":notes"      *> spcs () >> LogicAttributeNotes      <$> parseString
+  , ":language"   *> skipSpace >> LogicAttributeLanguage   <$> parseString
+  , ":extensions" *> skipSpace >> LogicAttributeExtensions <$> parseString
+  , ":values"     *> skipSpace >> LogicAttributeValues     <$> parseString
+  , ":notes"      *> skipSpace >> LogicAttributeNotes      <$> parseString
   , LogicAttributeAttribute <$> parseAttribute
   ]
   where
     parseLogicAttributeTheories = do
-      ":theories" *> spcs ()
+      ":theories" *> skipSpace
       par '('
       symbols <- NE.fromList <$> many1' parseSymbol
       par ')'
@@ -1386,7 +1381,7 @@ data Logic = Logic Symbol (NonEmpty LogicAttribute)
 parseLogic :: Parser Logic
 parseLogic = do
   par '('
-  "logic" *> spcs ()
+  "logic" *> skipSpace
   symbol          <- parseSymbol
   logicAttributes <- NE.fromList <$> many1' parseLogicAttribute
   par ')'
@@ -1440,7 +1435,7 @@ parseInfoFlag = choice
   , InfoFlagReasonUnknown        <$  string ":reason-unknown"
   , InfoFlagVersion              <$  string ":version"
   , InfoFlagKeyword              <$> parseKeyword
-  ] >>= spcs
+  ] <* skipSpace
 
 -- | Unparse 'InfoFlag'
 unparseInfoFlag :: InfoFlag -> Text
@@ -1700,7 +1695,7 @@ parseDatatypeDec = choice
       return $ DatatypeDec constructorDecs
     parseDatatypeDecPar = do
       par '('
-      "par" *> spcs ()
+      "par" *> skipSpace
       par '('
       symbols         <- NE.fromList <$> many1' parseSymbol
       par ')'
