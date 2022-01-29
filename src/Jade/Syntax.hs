@@ -333,6 +333,7 @@ import Data.Attoparsec.Text (
   choice, 
   hexadecimal,
   many',
+  many1',
   string,
   takeWhile1
   )
@@ -543,7 +544,7 @@ unparseSExpr = \case
   SExprSymbol symbol             -> unparseSymbol symbol
   SExprReserved reserved         -> unparseReserved reserved
   SExprKeyword keyword           -> unparseKeyword keyword
-  SExprs exprs                   -> unwords ["(", unwords undefined, ")"]
+  SExprs exprs                   -> T.unwords ["(", T.unwords undefined, ")"]
 
 -----------------
 -- Identifiers --
@@ -567,6 +568,7 @@ unparseIndex = \case
   IndexNumeral num -> unparseNumeral num
   IndexSymbol  sym -> unparseSymbol  sym
 
+
 -- | @\<identifier\> ::= \<symbol\> | ( _ \<symbol\> \<index\>+ )@
 data Identifier
   = -- | \<symbol\>
@@ -588,6 +590,7 @@ unparseIdentifier = \case
   IdentifierSymbol sym -> unparseSymbol sym
   IdentifierUnderscore _ _ -> undefined
 
+
 -----------
 -- Sorts --
 -----------
@@ -600,19 +603,27 @@ data Sort = Sort Identifier [Sort]
 parseSort :: Parser Sort
 parseSort = choice
   [ Sort <$> parseIdentifier <*> pure []
-  , undefined
+  , parseIdentifierSorts
   ]
+  where
+    parseIdentifierSorts = do
+      _          <- char '('
+      identifier <- parseIdentifier
+      sorts      <- many' parseSort
+      _          <- char ')'
+      return $ Sort identifier sorts
 
 -- | Unparse 'Sort'
 unparseSort :: Sort -> Text
 unparseSort = \case
   Sort identifier []    -> unparseIdentifier identifier
   Sort identifier sorts -> 
-    unwords [ "("
-            , unparseIdentifier identifier
-            , (unwords . map unparseSort) sorts
-            , ")"
-            ]
+    T.unwords [ "("
+              , unparseIdentifier identifier
+              , (T.unwords . map unparseSort) sorts
+              , ")"
+              ]
+
 
 ----------------
 -- Attributes --
@@ -630,15 +641,23 @@ parseAttributeValue :: Parser AttributeValue
 parseAttributeValue = choice
   [ AttributeValueSpecConstant <$> parseSpecConstant
   , AttributeValueSymbol       <$> parseSymbol
-  , undefined
+  , parseAttributeValueSExprs
   ]
+  where
+    parseAttributeValueSExprs = do
+      _     <- char '('
+      exprs <- many' parseSExpr
+      _     <- char ')'
+      return $ AttributeValueSExprs exprs
 
 -- | Unparse 'AttributeValue'
 unparseAttributeValue :: AttributeValue -> Text
 unparseAttributeValue = \case
   AttributeValueSpecConstant specConstant -> unparseSpecConstant specConstant
   AttributeValueSymbol symbol -> unparseSymbol symbol
-  AttributeValueSExprs _ -> undefined
+  AttributeValueSExprs exprs ->
+    T.unwords ["(", (T.unwords . map unparseSExpr) exprs, ")"]
+
 
 -- | @\<attribute\> ::= \<keyword\> | \<keyword\> \<attribute_value\>@
 data Attribute
@@ -652,14 +671,16 @@ data Attribute
 parseAttribute :: Parser Attribute
 parseAttribute = choice
   [ AttributeKeyword <$> parseKeyword
-  , undefined
+  , AttributeKeywordAttributeValue <$> parseKeyword <*> parseAttributeValue
   ]
 
 -- | Unparse 'Attribute'
 unparseAttribute :: Attribute -> Text
 unparseAttribute = \case
   AttributeKeyword keyword -> unparseKeyword keyword
-  AttributeKeywordAttributeValue keyword attributeValue -> undefined
+  AttributeKeywordAttributeValue keyword attributeValue ->
+    T.unwords [unparseKeyword keyword, unparseAttributeValue attributeValue]
+
 
 -----------
 -- Terms --
@@ -677,14 +698,28 @@ data QualIdentifier
 parseQualIdentifier :: Parser QualIdentifier
 parseQualIdentifier = choice
   [ QualIdentifier <$> parseIdentifier
-  , undefined
+  , parseQualIdentifierAs
   ]
+  where
+    parseQualIdentifierAs = do
+      _          <- char '('
+      _          <- string "as"
+      identifier <- parseIdentifier
+      sort       <- parseSort
+      _          <- char ')'
+      return $ QualIdentifierAs identifier sort
 
 -- | Unparse 'QualIdentifier'
 unparseQualIdentifier :: QualIdentifier -> Text
 unparseQualIdentifier = \case
     QualIdentifier identifier -> unparseIdentifier identifier
-    QualIdentifierAs identifier sort -> undefined
+    QualIdentifierAs identifier sort -> 
+      T.unwords [ "("
+                , "as"
+                , unparseIdentifier identifier
+                , unparseSort sort
+                , ")"
+                ]
 
 
 -- | @\<var_binding\> ::= ( \<symbol\> \<term\> )@
