@@ -26,7 +26,6 @@ module Subpar (
 import Control.Monad (forM)
 import Data.Attoparsec.Text (Result, parseWith)
 import Data.Text (Text)
-import qualified Data.Text    as T
 import qualified Data.Text.IO as TIO
 
 import Subpar.Process

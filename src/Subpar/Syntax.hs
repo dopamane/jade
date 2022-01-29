@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE StrictData        #-}
 {-|
 Module      : Subpar.Syntax
 Description : SMT-LIB version 2.6 syntax

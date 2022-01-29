@@ -1,28 +1,20 @@
 module Main where
 
-import Data.Text (
-    Text,
- )
+import Data.Text (Text)
 import qualified Data.Text.IO as TIO
 import Subpar (
-    --    Attribute (..),
-    --    Command (..),
-    --    InfoFlag (..),
-    --    Logic (..),
-    --    Option (..),
-    SmtHandle (..),
-    --    readExpr,
-    --    transmit,
-    --    transmit_,
-    withSmtProcess,
- )
-import System.IO (
-    BufferMode (LineBuffering),
-    hSetBuffering,
- )
-import Text.Megaparsec (
-    errorBundlePretty,
- )
+  --    Attribute (..),
+  --    Command (..),
+  --    InfoFlag (..),
+  --    Logic (..),
+  --    Option (..),
+  SmtHandle (..),
+  --    readExpr,
+  --    transmit,
+  --    transmit_,
+  withSmtProcess,
+  )
+import System.IO (BufferMode(LineBuffering), hSetBuffering)
 
 {-
 readResult :: Text -> IO ()
