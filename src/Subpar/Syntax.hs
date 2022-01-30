@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData        #-}
+{-# LANGUAGE TemplateHaskell   #-}
 {-|
 Module      : Subpar.Syntax
 Description : SMT-LIB version 2.6 syntax
@@ -327,6 +328,9 @@ module Subpar.Syntax (
     GeneralResponse (..),
     parseGeneralResponse,
     unparseGeneralResponse,
+
+    -- ** Property tests
+    syntaxTests
 ) where
 
 import Data.Attoparsec.Text (
@@ -336,6 +340,7 @@ import Data.Attoparsec.Text (
   hexadecimal,
   many',
   many1',
+  parseOnly,
   skipSpace,
   string,
   takeWhile1
@@ -349,6 +354,10 @@ import qualified Data.Text as T
 import Prelude hiding (String)
 import TextShow (fromText, toText)
 import TextShow.Data.Integral (showbBin, showbHex)
+
+import           Hedgehog hiding (Command)
+import qualified Hedgehog.Gen   as Gen
+import qualified Hedgehog.Range as Range
 
 -- | Parse parenthesis
 par :: Char -> Parser ()
@@ -370,6 +379,7 @@ parseReserved = undefined <* skipSpace
 unparseReserved :: Reserved -> Text
 unparseReserved (Reserved text) = text
 
+
 -- | @\<numeral\> ::= 0 | a non-empty sequence of digits not starting with 0@
 newtype Numeral = Numeral Integer
   deriving (Show, Read, Eq)
@@ -382,6 +392,7 @@ parseNumeral = undefined <* skipSpace
 unparseNumeral :: Numeral -> Text
 unparseNumeral = undefined
 
+
 -- | @\<decimal\> ::= \<numeral\>.0*\<numeral\>@
 newtype Decimal = Decimal Double
   deriving (Show, Read, Eq)
@@ -393,6 +404,7 @@ parseDecimal = undefined <* skipSpace
 -- | Unparse 'Decimal'
 unparseDecimal :: Decimal -> Text
 unparseDecimal = undefined
+
 
 {- |
 @
@@ -411,6 +423,7 @@ parseHexadecimal = "#x" *> Hexadecimal `fmap` hexadecimal <* skipSpace
 unparseHexadecimal :: Hexadecimal -> Text
 unparseHexadecimal (Hexadecimal h) = toText $ fromText "#x" <> showbHex h
 
+
 -- | @\<binary\> ::= #b followed by a non-empty sequence of 0 and 1 characters@
 newtype Binary = Binary Integer
   deriving (Show, Read, Eq)
@@ -427,6 +440,13 @@ parseBinary = "#b" *> Binary `fmap` binary <* skipSpace
 -- | Unparse 'Binary'
 unparseBinary :: Binary -> Text
 unparseBinary (Binary b) = toText $ fromText "#b" <> showbBin b
+
+-- | parseBinary . unparseBinary == id
+prop_binary :: Property
+prop_binary = property $ do
+  n <- forAll $ Gen.integral $ Range.linear 0 (maxBound :: Int)
+  let bin = Binary $ fromIntegral n
+  parseOnly parseBinary (unparseBinary bin) === Right bin
 
 {- |
 @
@@ -2410,3 +2430,7 @@ unparseGeneralResponse = \case
   GeneralResponseUnsupported -> "unsupported"
   GeneralResponseError str ->
     T.unwords ["(", "error", unparseString str, ")"]
+
+
+syntaxTests :: IO Bool
+syntaxTests = checkSequential $$(discover)
