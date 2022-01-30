@@ -347,6 +347,8 @@ import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
 import qualified Data.Text as T
 import Prelude hiding (String)
+import TextShow (fromText, toText)
+import TextShow.Data.Integral (showbBin, showbHex)
 
 -- | Parse parenthesis
 par :: Char -> Parser ()
@@ -407,7 +409,7 @@ parseHexadecimal = "#x" *> Hexadecimal `fmap` hexadecimal <* skipSpace
 
 -- | Unparse 'Hexadecimal'
 unparseHexadecimal :: Hexadecimal -> Text
-unparseHexadecimal = undefined
+unparseHexadecimal (Hexadecimal h) = toText $ fromText "#x" <> showbHex h
 
 -- | @\<binary\> ::= #b followed by a non-empty sequence of 0 and 1 characters@
 newtype Binary = Binary Integer
@@ -424,7 +426,7 @@ parseBinary = "#b" *> Binary `fmap` binary <* skipSpace
 
 -- | Unparse 'Binary'
 unparseBinary :: Binary -> Text
-unparseBinary = undefined
+unparseBinary (Binary b) = toText $ fromText "#b" <> showbBin b
 
 {- |
 @

@@ -45,6 +45,7 @@ library
   build-depends: base,
                  process,
                  text,
+                 text-show,
                  attoparsec
 
   hs-source-dirs: src
