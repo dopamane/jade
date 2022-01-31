@@ -336,7 +336,8 @@ module Subpar.Syntax (
 import Data.Attoparsec.Text (
   Parser,
   char,
-  choice, 
+  choice,
+  decimal,
   hexadecimal,
   many',
   many1',
@@ -352,7 +353,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
 import qualified Data.Text as T
 import Prelude hiding (String)
-import TextShow (fromText, toText)
+import TextShow (fromText, showt, toText)
 import TextShow.Data.Integral (showbBin, showbHex)
 
 import           Hedgehog hiding (Command)
@@ -386,11 +387,11 @@ newtype Numeral = Numeral Integer
 
 -- | Parse 'Numeral'
 parseNumeral :: Parser Numeral
-parseNumeral = undefined <* skipSpace
+parseNumeral = Numeral `fmap` decimal <* skipSpace -- decimal might be loose
 
 -- | Unparse 'Numeral'
 unparseNumeral :: Numeral -> Text
-unparseNumeral = undefined
+unparseNumeral (Numeral n) = showt n
 
 
 -- | @\<decimal\> ::= \<numeral\>.0*\<numeral\>@
@@ -423,6 +424,13 @@ parseHexadecimal = "#x" *> Hexadecimal `fmap` hexadecimal <* skipSpace
 unparseHexadecimal :: Hexadecimal -> Text
 unparseHexadecimal (Hexadecimal h) = toText $ fromText "#x" <> showbHex h
 
+-- | 'parseHexadecimal' . 'unparseHexadecimal' == id
+prop_hexadecimal_forward :: Property
+prop_hexadecimal_forward = property $ do
+  n <- forAll $ Gen.integral $ Range.linear 0 (maxBound :: Int)
+  let hex = Hexadecimal $ fromIntegral n
+  parseOnly parseHexadecimal (unparseHexadecimal hex) === Right hex
+
 
 -- | @\<binary\> ::= #b followed by a non-empty sequence of 0 and 1 characters@
 newtype Binary = Binary Integer
@@ -441,20 +449,13 @@ parseBinary = "#b" *> Binary `fmap` binary <* skipSpace
 unparseBinary :: Binary -> Text
 unparseBinary (Binary b) = toText $ fromText "#b" <> showbBin b
 
--- | parseBinary . unparseBinary == id
+-- | 'parseBinary' . 'unparseBinary' == id
 prop_binary_forward :: Property
 prop_binary_forward = property $ do
   n <- forAll $ Gen.integral $ Range.linear 0 (maxBound :: Int)
   let bin = Binary $ fromIntegral n
   parseOnly parseBinary (unparseBinary bin) === Right bin
 
-{-
--- | unparseBinary . parseBinary == id
-prop_binary_backward :: Property
-prop_binary_backward = property $ do
-  s <- undefined
-  unparseBinary (fromRight (Binary 0) (parseOnly parseBinary s)) === s
--}
 
 {- |
 @
@@ -480,29 +481,36 @@ unparseString = undefined
              and ends with | and does not otherwise include | or \
 @
 -}
-newtype Symbol = Symbol Text
+newtype Symbol = Symbol{unSymbol :: Text}
   deriving (Show, Read, Eq)
 
 -- | Parse 'Symbol'
 parseSymbol :: Parser Symbol
-parseSymbol = undefined <* skipSpace
+parseSymbol = choice
+  [ undefined 
+  , char '|' *> undefined <* char '|'
+  ] <* skipSpace
 
 -- | Unparse 'Symbol'
 unparseSymbol :: Symbol -> Text
-unparseSymbol = undefined
+unparseSymbol = unSymbol
 
 
 -- | @\<keyword\> ::= :\<simple_symbol\>@
-newtype Keyword = Keyword Text
+newtype Keyword = Keyword{unKeyword :: Text}
   deriving (Show, Read, Eq)
 
 -- | Parse 'Keyword'
 parseKeyword :: Parser Keyword
-parseKeyword = undefined <* skipSpace
+parseKeyword = do
+  _ <- char ':'
+  simpleSymbol <- undefined
+  skipSpace
+  return $ Keyword simpleSymbol
 
 -- | Unparse 'Keyword'
 unparseKeyword :: Keyword -> Text
-unparseKeyword = undefined
+unparseKeyword (Keyword keyword) = ":" <> keyword
 
 
 -------------------
@@ -591,7 +599,7 @@ unparseSExpr = \case
   SExprReserved     reserved     -> unparseReserved reserved
   SExprKeyword      keyword      -> unparseKeyword keyword
   SExprs            exprs        -> 
-    T.unwords ["(", (T.unwords . map unparseSExpr) exprs, ")"]
+    T.unwords ["(", T.unwords $ unparseSExpr <$> exprs, ")"]
 
 
 -----------------
@@ -1782,7 +1790,7 @@ unparseFunctionDec (FunctionDec symbol sortedVars sort) = T.unwords
   [ "("
   , unparseSymbol symbol
   , "("
-  , (T.unwords . map unparseSortedVar) sortedVars
+  , T.unwords $ unparseSortedVar <$> sortedVars
   , ")"
   , unparseSort sort
   , ")"
@@ -1797,9 +1805,9 @@ data FunctionDef = FunctionDef Symbol [SortedVar] Sort Term
 parseFunctionDef :: Parser FunctionDef
 parseFunctionDef = do
   symbol     <- parseSymbol
-  _          <- char '('
+  par '('
   sortedVars <- many' parseSortedVar
-  _          <- char ')'
+  par ')'
   sort       <- parseSort
   term       <- parseTerm
   return $ FunctionDef symbol sortedVars sort term
@@ -1808,7 +1816,7 @@ unparseFunctionDef :: FunctionDef -> Text
 unparseFunctionDef (FunctionDef symbol sortedVars sort term) = T.unwords 
   [ unparseSymbol symbol
   , "("
-  , (T.unwords . map unparseSortedVar) sortedVars
+  , T.unwords $ unparseSortedVar <$> sortedVars
   , ")"
   , unparseSort sort
   , unparseTerm term
@@ -1828,10 +1836,10 @@ parsePropLiteral = choice
   ]
   where
     parsePropLiteralNotSymbol = do
-      _      <- char '('
-      _      <- string "not"
+      par '('
+      "not" *> skipSpace
       symbol <- parseSymbol
-      _      <- char ')'
+      par ')'
       return $ PropLiteralNotSymbol symbol
 
 -- | Unparse 'PropLiteral'
@@ -1940,7 +1948,234 @@ data Command
 
 -- | Parse 'Command'
 parseCommand :: Parser Command
-parseCommand = undefined
+parseCommand = choice
+  [ parseAssert
+  , parseCheckSat
+  , parseCheckSatAssuming
+  , parseDeclareConst
+  , parseDeclareDatatype
+  , parseDeclareDatatypes
+  , parseDeclareFun
+  , parseDeclareSort
+  , parseDefineFun
+  , parseDefineFunRec
+  , parseDefineFunsRec
+  , parseDefineSort
+  , parseEcho
+  , parseExit
+  , parseGetAssertions
+  , parseGetAssignment
+  , parseGetInfo
+  , parseGetModel
+  , parseGetOption
+  , parseGetProof
+  , parseGetUnsatAssumptions
+  , parseGetUnsatCore
+  , parseGetValue
+  , parsePop
+  , parsePush
+  , parseReset
+  , parseResetAssertions
+  , parseSetInfo
+  , parseSetLogic
+  , parseSetOption
+  ]
+  where
+    parseAssert = do
+      par '('
+      "assert" *> skipSpace
+      term <- parseTerm
+      par ')'
+      return $ Assert term
+    parseCheckSat = do
+      par '('
+      "check-sat" *> skipSpace
+      par ')'
+      return CheckSat
+    parseCheckSatAssuming = do
+      par '('
+      "check-sat-assuming" *> skipSpace
+      par '('
+      propLiterals <- many' parsePropLiteral
+      par ')'
+      par ')'
+      return $ CheckSatAssuming propLiterals
+    parseDeclareConst = do
+      par '('
+      "declare-const" *> skipSpace
+      symbol <- parseSymbol
+      sort   <- parseSort
+      par ')'
+      return $ DeclareConst symbol sort
+    parseDeclareDatatype = do
+      par '('
+      "declare-datatype" *> skipSpace
+      symbol      <- parseSymbol
+      datatypeDec <- parseDatatypeDec
+      par ')'
+      return $ DeclareDatatype symbol datatypeDec
+    parseDeclareDatatypes = do
+      par '('
+      "declare-datatypes" *> skipSpace
+      par '('
+      sortDecs     <- NE.fromList <$> many1' parseSortDec
+      par ')'
+      par '('
+      datatypeDecs <- NE.fromList <$> many1' parseDatatypeDec
+      par ')'
+      par ')'
+      return $ DeclareDatatypes $ NE.zip sortDecs datatypeDecs
+    parseDeclareFun = do
+      par '('
+      "declare-fun" *> skipSpace
+      symbol <- parseSymbol
+      par '('
+      sorts  <- many' parseSort
+      par ')'
+      sort   <- parseSort
+      par ')'
+      return $ DeclareFun symbol sorts sort
+    parseDeclareSort = do
+      par '('
+      "declare-sort" *> skipSpace
+      symbol  <- parseSymbol
+      numeral <- parseNumeral
+      par ')'
+      return $ DeclareSort symbol numeral
+    parseDefineFun = do
+      par '('
+      "define-fun" *> skipSpace
+      functionDef <- parseFunctionDef
+      par ')'
+      return $ DefineFun functionDef
+    parseDefineFunRec = do
+      par '('
+      "define-fun-rec" *> skipSpace
+      functionDef <- parseFunctionDef
+      par ')'
+      return $ DefineFunRec functionDef
+    parseDefineFunsRec = do
+      par '('
+      "define-funs-rec" *> skipSpace
+      par '('
+      functionDecs <- NE.fromList <$> many1' parseFunctionDec
+      par ')'
+      par '('
+      terms        <- NE.fromList <$> many1' parseTerm
+      par ')'
+      par ')'
+      return $ DefineFunsRec $ NE.zip functionDecs terms
+    parseDefineSort = do
+      par '('
+      "define-sort" *> skipSpace
+      symbol <- parseSymbol
+      par '('
+      symbols <- many' parseSymbol
+      par ')'
+      sort <- parseSort
+      par ')'
+      return $ DefineSort symbol symbols sort
+    parseEcho = do
+      par '('
+      "echo" *> skipSpace
+      str <- parseString
+      par ')'
+      return $ Echo str
+    parseExit = do
+      par '('
+      "exit" *> skipSpace
+      par ')'
+      return Exit
+    parseGetAssertions = do
+      par '('
+      "get-assertions" *> skipSpace
+      par ')'
+      return GetAssertions
+    parseGetAssignment = do
+      par '('
+      "get-assignment" *> skipSpace
+      par ')'
+      return GetAssignment
+    parseGetInfo = do
+      par '('
+      "get-info" *> skipSpace
+      infoFlag <- parseInfoFlag
+      par ')'
+      return $ GetInfo infoFlag
+    parseGetModel = do
+      par '('
+      "get-model" *> skipSpace
+      par ')'
+      return GetModel
+    parseGetOption = do
+      par '('
+      "get-option" *> skipSpace
+      keyword <- parseKeyword
+      par ')'
+      return $ GetOption keyword
+    parseGetProof = do
+      par '('
+      "get-proof" *> skipSpace
+      par ')'
+      return GetProof
+    parseGetUnsatAssumptions = do
+      par '('
+      "get-unsat-assumptions" *> skipSpace
+      par ')'
+      return GetUnsatAssumptions
+    parseGetUnsatCore = do
+      par '('
+      "get-unsat-core" *> skipSpace
+      par ')'
+      return GetUnsatCore
+    parseGetValue = do
+      par '('
+      "get-value" *> skipSpace
+      par '('
+      terms <- NE.fromList <$> many1' parseTerm
+      par ')'
+      par ')'
+      return $ GetValue terms
+    parsePop = do
+      par '('
+      "pop" *> skipSpace
+      num <- parseNumeral
+      par ')'
+      return $ Pop num
+    parsePush = do
+      par '('
+      "push" *> skipSpace
+      num <- parseNumeral
+      par ')'
+      return $ Push num
+    parseReset = do
+      par '('
+      "reset" *> skipSpace
+      par ')'
+      return Reset
+    parseResetAssertions = do
+      par '('
+      "reset_assertions" *> skipSpace
+      par ')'
+      return ResetAssertions
+    parseSetInfo = do
+      par '('
+      "set-info" *> skipSpace
+      attribute <- parseAttribute
+      par ')'
+      return $ SetInfo attribute
+    parseSetLogic = do
+      par '('
+      "set-logic" *> skipSpace
+      symbol <- parseSymbol
+      par ')'
+      return $ SetLogic symbol
+    parseSetOption = do
+      par '('
+      "set-option" *> skipSpace
+      option <- parseOption
+      par ')'
+      return $ SetOption option
 
 -- | Unparse 'Command'
 unparseCommand :: Command -> Text
@@ -1948,7 +2183,7 @@ unparseCommand = undefined
 
 
 -- | @\<script\> ::= \<command\>*@
-newtype Script = Script [Command]
+newtype Script = Script{ unScript :: [Command] }
   deriving (Show, Read, Eq)
 
 -- | Parse 'Script'
@@ -1957,7 +2192,7 @@ parseScript = Script <$> many' parseCommand
 
 -- | Unparse 'Script'
 unparseScript :: Script -> Text
-unparseScript (Script commands) = T.unlines $ map unparseCommand commands
+unparseScript (Script commands) = T.unlines $ unparseCommand <$> commands
 
 
 -----------------------
@@ -2081,22 +2316,22 @@ parseInfoResponse = choice
   ]
   where
     parseInfoResponseAssertionStackLevels = do
-      _ <- string ":assertion-stack-levels"
+      ":assertion-stack-levels" *> skipSpace
       InfoResponseAssertionStackLevels <$> parseNumeral
     parseInfoResponseAuthors = do
-      _ <- string ":authors"
+      ":authors" *> skipSpace
       InfoResponseAuthors <$> parseString
     parseInfoResponseErrorBehavior = do
-      _ <- string ":error-behavior"
+      ":error-behavior" *> skipSpace
       InfoResponseErrorBehavior <$> parseErrorBehavior
     parseInfoResponseName = do
-      _ <- string ":name"
+      ":name" *> skipSpace
       InfoResponseName <$> parseString
     parseInfoResponseReasonUnknown = do
-      _ <- string ":reason-unknown"
+      ":reason-unknown" *> skipSpace
       InfoResponseReasonUnknown <$> parseReasonUnknown
     parseInfoResponseVersion = do
-      _ <- string ":version"
+      ":version" *> skipSpace
       InfoResponseVersion <$> parseString
 
 -- | Unparse 'InfoResponse'
