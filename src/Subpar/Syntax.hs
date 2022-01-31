@@ -442,11 +442,19 @@ unparseBinary :: Binary -> Text
 unparseBinary (Binary b) = toText $ fromText "#b" <> showbBin b
 
 -- | parseBinary . unparseBinary == id
-prop_binary :: Property
-prop_binary = property $ do
+prop_binary_forward :: Property
+prop_binary_forward = property $ do
   n <- forAll $ Gen.integral $ Range.linear 0 (maxBound :: Int)
   let bin = Binary $ fromIntegral n
   parseOnly parseBinary (unparseBinary bin) === Right bin
+
+{-
+-- | unparseBinary . parseBinary == id
+prop_binary_backward :: Property
+prop_binary_backward = property $ do
+  s <- undefined
+  unparseBinary (fromRight (Binary 0) (parseOnly parseBinary s)) === s
+-}
 
 {- |
 @
@@ -856,15 +864,15 @@ data MatchCase = MatchCase Pattern Term
 parseMatchCase :: Parser MatchCase
 parseMatchCase = do
   par '('
-  pattern <- parsePattern
-  term    <- parseTerm
+  patt <- parsePattern
+  term <- parseTerm
   par ')'
-  return $ MatchCase pattern term
+  return $ MatchCase patt term
 
 -- | Unparse 'MatchCase'
 unparseMatchCase :: MatchCase -> Text
-unparseMatchCase (MatchCase pattern term) =
-  T.unwords ["(", unparsePattern pattern, unparseTerm term, ")"]
+unparseMatchCase (MatchCase patt term) =
+  T.unwords ["(", unparsePattern patt, unparseTerm term, ")"]
 
 
 {- |
@@ -1478,7 +1486,7 @@ unparseInfoFlag = \case
 ---------------------
 
 -- | @\<b_value\> ::= true | false@
-data BValue = BValue Bool
+newtype BValue = BValue Bool
   deriving (Show, Read, Eq)
 
 -- | Parse 'BValue'

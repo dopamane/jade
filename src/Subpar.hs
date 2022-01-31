@@ -35,7 +35,7 @@ import Subpar.Syntax
 transmit :: SmtHandle -> [Command] -> IO [Result GeneralResponse]
 transmit hndl cmds = forM cmds $ \cmd -> do
   send hndl $ unparseCommand cmd
-  parseWith (recv hndl) parseGeneralResponse =<< (recv hndl)
+  parseWith (recv hndl) parseGeneralResponse =<< recv hndl
 
 -- | Send 'Command's without receiving 'GeneralResponse's.
 transmit_ :: SmtHandle -> [Command] -> IO ()
