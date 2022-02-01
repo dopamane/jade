@@ -1,3 +1,4 @@
+{-# LANGUAGE StrictData #-}
 {-|
 Module      : Subpar.Process
 Description : SMT process handling
@@ -25,10 +26,10 @@ import System.Process (
 
 -- | Smt 'Handle'
 data SmtHandle = SmtHandle
-  { smtIn   :: !Handle -- ^ Input
-  , smtOut  :: !Handle -- ^ Output
-  , smtErr  :: !Handle -- ^ Error
-  , smtProc :: !ProcessHandle
+  { smtIn   :: Handle -- ^ Input
+  , smtOut  :: Handle -- ^ Output
+  , smtErr  :: Handle -- ^ Error
+  , smtProc :: ProcessHandle
   }
 
 -- | Smt 'CreateProcess'
