@@ -338,7 +338,6 @@ import Data.Attoparsec.Text (
   char,
   choice,
   decimal,
-  endOfLine,
   hexadecimal,
   many',
   many1',

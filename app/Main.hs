@@ -2,7 +2,6 @@ module Main where
 
 import Data.Attoparsec.Text (IResult(Done))
 import Data.Text (Text)
-import qualified Data.Text.IO as TIO
 import Subpar (
   --    Attribute (..),
   BValue(..),
@@ -13,7 +12,6 @@ import Subpar (
   SmtHandle(..),
   transmit,
   transmit_,
-  unparseCommand,
   withSmtProcess,
   )
 import System.IO (hSetBuffering, BufferMode(..))
@@ -23,10 +21,6 @@ main = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
   hSetBuffering (smtIn  smtHandle) LineBuffering
   hSetBuffering (smtOut smtHandle) LineBuffering
   let printSuccess = SetOption $ OptionPrintSuccess $ BValue True
-  -- TIO.hPutStrLn (smtIn  smtHandle) $ unparseCommand printSuccess
-  -- TIO.hGetLine  (smtOut smtHandle) >>= print
-  -- TIO.hGetLine  (smtOut smtHandle) >>= print
-  -- transmit_ smtHandle [printSuccess]
   [result] <- transmit smtHandle [printSuccess]
   case result of
     Done _ r -> print r

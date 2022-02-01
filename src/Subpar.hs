@@ -47,7 +47,10 @@ transmit_ hndl = mapM_ (send hndl . unparseCommand)
 send :: SmtHandle -> Text -> IO ()
 send hndl = TIO.hPutStrLn (smtIn hndl)
 
--- | Receive line of 'Text' from 'SmtHandle'. See 'transmit'.
+-- | Receive line of 'Text' from 'SmtHandle'. 'recv' first checks
+-- if there is at least one item available for input from the handle using
+-- 'hReady'. If there is nothing available, 'recv' returns 'T.empty'. Otherwise
+-- it uses 'TIO.hGetLine'. See 'transmit'.
 recv :: SmtHandle -> IO Text
 recv hndl = do
   isReady <- hReady $ smtOut hndl
