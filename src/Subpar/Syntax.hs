@@ -369,16 +369,62 @@ par p = char p >> skipSpace
 ------------
 
 -- | Reserved words
-newtype Reserved = Reserved Text
+newtype Reserved = Reserved{ unReserved :: Text }
   deriving (Show, Read, Eq)
+
+reserved :: [Text]
+reserved =
+  [ "!"
+  , "_"
+  , "as"
+  , "BINARY"
+  , "DECIMAL"
+  , "exists"
+  , "HEXADECIMAL"
+  , "forall"
+  , "let"
+  , "match"
+  , "NUMERAL"
+  , "par"
+  , "STRING"
+  , "assert"
+  , "check-sat"
+  , "check-sat-assuming"
+  , "declare-const"
+  , "declare-datatype"
+  , "declare-datatypes"
+  , "declare-fun"
+  , "declare-sort"
+  , "define-fun"
+  , "define-fun-rec"
+  , "define-sort"
+  , "echo"
+  , "exit"
+  , "get-assertions"
+  , "get-assignment"
+  , "get-info"
+  , "get-model"
+  , "get-option"
+  , "get-proof"
+  , "get-unsat-assumptions"
+  , "get-unsat-core"
+  , "get-value"
+  , "pop"
+  , "push"
+  , "reset"
+  , "reset-assertions"
+  , "set-info"
+  , "set-logic"
+  , "set-option"
+  ]
 
 -- | Parse 'Reserved'
 parseReserved :: Parser Reserved
-parseReserved = undefined <* skipSpace
+parseReserved = Reserved `fmap` choice (string <$> reserved) <* skipSpace
 
 -- | Unparse 'Reserved'
 unparseReserved :: Reserved -> Text
-unparseReserved (Reserved text) = text
+unparseReserved = unReserved
 
 
 -- | @\<numeral\> ::= 0 | a non-empty sequence of digits not starting with 0@
@@ -596,7 +642,7 @@ unparseSExpr :: SExpr -> Text
 unparseSExpr = \case
   SExprSpecConstant specConstant -> unparseSpecConstant specConstant
   SExprSymbol       symbol       -> unparseSymbol symbol
-  SExprReserved     reserved     -> unparseReserved reserved
+  SExprReserved     rsvd         -> unparseReserved rsvd
   SExprKeyword      keyword      -> unparseKeyword keyword
   SExprs            exprs        -> 
     T.unwords ["(", T.unwords $ unparseSExpr <$> exprs, ")"]
