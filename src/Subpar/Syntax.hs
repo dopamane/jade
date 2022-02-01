@@ -338,6 +338,7 @@ import Data.Attoparsec.Text (
   char,
   choice,
   decimal,
+  endOfLine,
   hexadecimal,
   many',
   many1',
@@ -2831,9 +2832,9 @@ data GeneralResponse
 parseGeneralResponse :: Parser GeneralResponse
 parseGeneralResponse = choice
   [ GeneralResponseSuccess <$ string "success"
-  , GeneralResponseSpecificSuccessResponse <$> parseSpecificSuccessResponse
+  -- , GeneralResponseSpecificSuccessResponse <$> parseSpecificSuccessResponse
   , GeneralResponseUnsupported <$ string "unsupported"
-  , parseGeneralResponseError
+  -- , parseGeneralResponseError
   ] <* skipSpace
   where
     parseGeneralResponseError = do

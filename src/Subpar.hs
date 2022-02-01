@@ -19,14 +19,16 @@ module Subpar (
   recv,
 
   -- * Syntax
-  module Subpar.Syntax
+  module Subpar.Syntax,
 
 ) where
 
 import Control.Monad (forM)
 import Data.Attoparsec.Text (Result, parseWith)
 import Data.Text (Text)
+import qualified Data.Text    as T
 import qualified Data.Text.IO as TIO
+import System.IO (hReady)
 
 import Subpar.Process
 import Subpar.Syntax
@@ -35,7 +37,7 @@ import Subpar.Syntax
 transmit :: SmtHandle -> [Command] -> IO [Result GeneralResponse]
 transmit hndl cmds = forM cmds $ \cmd -> do
   send hndl $ unparseCommand cmd
-  parseWith (recv hndl) parseGeneralResponse =<< recv hndl
+  parseWith (recv hndl) parseGeneralResponse =<< TIO.hGetLine (smtOut hndl)
 
 -- | Send 'Command's without receiving 'GeneralResponse's.
 transmit_ :: SmtHandle -> [Command] -> IO ()
@@ -47,4 +49,8 @@ send hndl = TIO.hPutStrLn (smtIn hndl)
 
 -- | Receive line of 'Text' from 'SmtHandle'. See 'transmit'.
 recv :: SmtHandle -> IO Text
-recv = TIO.hGetLine . smtOut
+recv hndl = do
+  isReady <- hReady $ smtOut hndl
+  if isReady
+    then TIO.hGetLine $ smtOut hndl
+    else return T.empty

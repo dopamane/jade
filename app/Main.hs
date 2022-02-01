@@ -1,29 +1,38 @@
 module Main where
 
+import Data.Attoparsec.Text (IResult(Done))
 import Data.Text (Text)
 import qualified Data.Text.IO as TIO
 import Subpar (
   --    Attribute (..),
-  --    Command (..),
+  BValue(..),
+  Command(..),
   --    InfoFlag (..),
   --    Logic (..),
-  --    Option (..),
-  SmtHandle (..),
-  --    readExpr,
-  --    transmit,
-  --    transmit_,
+  Option(..),
+  SmtHandle(..),
+  transmit,
+  transmit_,
+  unparseCommand,
   withSmtProcess,
   )
-import System.IO (BufferMode(LineBuffering), hSetBuffering)
+import System.IO (hSetBuffering, BufferMode(..))
 
-{-
-readResult :: Text -> IO ()
-readResult text = case readExpr "" text of
-    Left bundle -> putStrLn $ errorBundlePretty bundle
-    Right expr -> print expr
--}
 main :: IO ()
-main = putStrLn "Hello World" -- ex310
+main = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
+  hSetBuffering (smtIn  smtHandle) LineBuffering
+  hSetBuffering (smtOut smtHandle) LineBuffering
+  let printSuccess = SetOption $ OptionPrintSuccess $ BValue True
+  -- TIO.hPutStrLn (smtIn  smtHandle) $ unparseCommand printSuccess
+  -- TIO.hGetLine  (smtOut smtHandle) >>= print
+  -- TIO.hGetLine  (smtOut smtHandle) >>= print
+  -- transmit_ smtHandle [printSuccess]
+  [result] <- transmit smtHandle [printSuccess]
+  case result of
+    Done _ r -> print r
+    r -> error $ show r
+  transmit_ smtHandle [Exit]
+  
 {-
 ex311 :: IO ()
 ex311 = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
