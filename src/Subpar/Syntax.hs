@@ -830,7 +830,7 @@ unparseSortedVar (SortedVar symbol sort) =
   T.unwords ["(", unparseSymbol symbol, unparseSort sort, ")"]
 
 
--- | \<pattern\> ::= \<symbol\> | ( \<symbol\> \<symbol\>+ )
+-- | @\<pattern\> ::= \<symbol\> | ( \<symbol\> \<symbol\>+ )@
 data Pattern
   = -- | \<symbol\>
     Pattern Symbol
@@ -864,7 +864,7 @@ unparsePattern = \case
               ]
 
 
--- | \<match_case\> ::= ( \<pattern\> \<term\> )
+-- | @\<match_case\> ::= ( \<pattern\> \<term\> )@
 data MatchCase = MatchCase Pattern Term
     deriving (Show, Read, Eq)
 
