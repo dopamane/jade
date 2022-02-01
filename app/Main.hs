@@ -1,17 +1,22 @@
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
 import Data.Attoparsec.Text (IResult(Done))
-import Data.Text (Text)
 import Subpar (
-  --    Attribute (..),
+  Attribute(..),
+  AttributeValue(..),
   BValue(..),
   Command(..),
-  --    InfoFlag (..),
-  --    Logic (..),
+  Identifier(..),
+  Keyword(..),
   Option(..),
   SmtHandle(..),
+  Sort(..),
+  Symbol(..),
   transmit,
   transmit_,
+  unparseCommand,
   withSmtProcess,
   )
 import System.IO (hSetBuffering, BufferMode(..))
@@ -21,11 +26,40 @@ main = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
   hSetBuffering (smtIn  smtHandle) LineBuffering
   hSetBuffering (smtOut smtHandle) LineBuffering
   let printSuccess = SetOption $ OptionPrintSuccess $ BValue True
-  [result] <- transmit smtHandle [printSuccess]
-  case result of
-    Done _ r -> print r
-    r -> error $ show r
+      setSmtLibVer = SetInfo $
+                       AttributeKeywordAttributeValue
+                         (Keyword "smt-lib-version")
+                         (AttributeValueSymbol $ Symbol "2.6")
+      setLogicQFLIA = SetLogic $ Symbol "QF_LIA"
+      declareConstWInt = DeclareConst
+                           (Symbol "w")
+                           (Sort (IdentifierSymbol $ Symbol "Int") [])
+      declareConstXInt = DeclareConst
+                           (Symbol "x")
+                           (Sort (IdentifierSymbol $ Symbol "Int") [])
+      declareConstYInt = DeclareConst
+                           (Symbol "y")
+                           (Sort (IdentifierSymbol $ Symbol "Int") [])
+      declareConstZInt = DeclareConst
+                           (Symbol "z")
+                           (Sort (IdentifierSymbol $ Symbol "Int") [])
+      assertXGtY = undefined
+  transmit 
+    smtHandle 
+    [ printSuccess
+    , setSmtLibVer
+    , setLogicQFLIA
+    , declareConstWInt
+    , declareConstXInt
+    , declareConstYInt
+    , declareConstZInt
+    ] >>= mapM_ printResult
   transmit_ smtHandle [Exit]
+  print $ unparseCommand declareConstWInt
+  where
+    printResult = \case
+      Done _ r -> print r
+      r -> error $ show r
   
 {-
 ex311 :: IO ()
