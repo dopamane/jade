@@ -773,7 +773,7 @@ parseQualIdentifier = choice
   where
     parseQualIdentifierAs = do
       par '('
-      string "as" >> skipSpace
+      "as" *> skipSpace
       identifier <- parseIdentifier
       sort       <- parseSort
       par ')'
@@ -1502,7 +1502,7 @@ parseBValue :: Parser BValue
 parseBValue = choice 
   [ BValue True  <$ string "true"
   , BValue False <$ string "false"
-  ]
+  ] <* skipSpace
 
 -- | Unparse 'BValue'
 unparseBValue :: BValue -> Text
