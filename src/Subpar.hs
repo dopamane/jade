@@ -50,7 +50,9 @@ send hndl = TIO.hPutStrLn (smtIn hndl)
 -- | Receive line of 'Text' from 'SmtHandle'. 'recv' first checks
 -- if there is at least one item available for input from the handle using
 -- 'hReady'. If there is nothing available, 'recv' returns 'T.empty'. Otherwise
--- it uses 'TIO.hGetLine'. See 'transmit'.
+-- it uses 'TIO.hGetLine'.
+-- Relevant SO thread: https://stackoverflow.com/q/33225837/4051020
+-- See 'transmit'.
 recv :: SmtHandle -> IO Text
 recv hndl = do
   isReady <- hReady $ smtOut hndl
