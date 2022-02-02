@@ -520,6 +520,25 @@ parseString = undefined <* skipSpace
 unparseString :: String -> Text
 unparseString = undefined
 
+
+{- |
+@
+\<simple_symbol> ::= a non-empty sequence of letters, digits, and the
+characters + - / * = % ? ! . $ _ ~ ^ < > \@ that does not start with a digit.
+@
+-}
+newtype SimpleSymbol = SimpleSymbol{ unSimpleSymbol :: Text }
+  deriving (Show, Read, Eq)
+
+-- | Parse 'SimpleSymbol'
+parseSimpleSymbol :: Parser SimpleSymbol
+parseSimpleSymbol = undefined <* skipSpace
+
+-- | Unparse 'SimpleSymbol'
+unparseSimpleSymbol :: SimpleSymbol -> Text
+unparseSimpleSymbol = unSimpleSymbol
+
+
 {- |
 @
 \<symbol\> ::= \<simple_symbol\>
