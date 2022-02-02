@@ -3,6 +3,7 @@
 module Main where
 
 import Data.Attoparsec.Text (IResult(Done))
+import Data.ByteString.Builder (toLazyByteString)
 import Subpar (
   Attribute(..),
   AttributeValue(..),
@@ -19,11 +20,16 @@ import Subpar (
   unparseCommand,
   withSmtProcess,
   )
-import System.IO (hSetBuffering, BufferMode(..))
+import System.IO (
+  hSetBinaryMode,
+  hSetBuffering,
+  BufferMode(..)
+  )
 
 main :: IO ()
 main = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
-  hSetBuffering (smtIn  smtHandle) LineBuffering
+  hSetBinaryMode (smtIn smtHandle) True
+  hSetBuffering (smtIn  smtHandle) $ BlockBuffering Nothing
   hSetBuffering (smtOut smtHandle) LineBuffering
   let printSuccess = SetOption $ OptionPrintSuccess $ BValue True
       setSmtLibVer = SetInfo $
@@ -44,6 +50,7 @@ main = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
                            (Symbol "z")
                            (Sort (IdentifierSymbol $ Symbol "Int") [])
       assertXGtY = undefined
+  {-
   transmit 
     smtHandle 
     [ printSuccess
@@ -55,11 +62,12 @@ main = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
     , declareConstZInt
     ] >>= mapM_ printResult
   transmit_ smtHandle [Exit]
-  print $ unparseCommand declareConstWInt
+  -}
+  print $ toLazyByteString $ unparseCommand declareConstWInt
   where
-    printResult = \case
-      Done _ r -> print r
-      r -> error $ show r
+    -- printResult = \case
+    --  Done _ r -> print r
+    --  r -> error $ show r
   
 {-
 ex311 :: IO ()

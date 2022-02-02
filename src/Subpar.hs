@@ -24,9 +24,11 @@ module Subpar (
 ) where
 
 import Control.Monad (forM)
-import Data.Attoparsec.ByteString (Result, parseWith)
+import Data.Attoparsec.ByteString.Char8 (Result, parseWith)
+import Data.ByteString.Builder (hPutBuilder)
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as C
+import qualified Data.ByteString.Lazy.Char8 as CL
 import System.IO (hReady)
 
 import Subpar.Process
@@ -35,16 +37,16 @@ import Subpar.Syntax
 -- | Send 'Command's and receive 'GeneralResponse's.
 transmit :: SmtHandle -> [Command] -> IO [Result GeneralResponse]
 transmit hndl cmds = forM cmds $ \cmd -> do
-  send hndl $ unparseCommand cmd
+  send hndl cmd
   parseWith (recv hndl) parseGeneralResponse =<< C.hGetLine (smtOut hndl)
 
 -- | Send 'Command's without receiving 'GeneralResponse's.
 transmit_ :: SmtHandle -> [Command] -> IO ()
-transmit_ hndl = mapM_ (send hndl . unparseCommand)
+transmit_ hndl = mapM_ (send hndl)
 
--- | Send line of 'ByteString' to 'SmtHandle'. See 'transmit' and 'transmit_'.
-send :: SmtHandle -> ByteString -> IO ()
-send hndl = C.hPutStrLn (smtIn hndl)
+-- | Send 'Command' to 'SmtHandle'. See 'transmit' and 'transmit_'.
+send :: SmtHandle -> Command -> IO ()
+send hndl = hPutBuilder (smtIn hndl) . unparseCommand
 
 -- | Receive line of 'ByteString' from 'SmtHandle'. 'recv' first checks
 -- if there is at least one item available for input from the handle using

@@ -37,9 +37,9 @@ module Subpar.Syntax (
     unparseBinary,
 
     -- *** String
-    String (..),
-    parseString,
-    unparseString,
+    SString (..),
+    parseSString,
+    unparseSString,
 
     -- *** Symbol
     Symbol (..),
@@ -333,11 +333,12 @@ module Subpar.Syntax (
     syntaxTests
 ) where
 
-import Data.Attoparsec.ByteString (
+import Data.Attoparsec.ByteString.Char8 (
   Parser,
   char,
   choice,
   decimal,
+  double,
   hexadecimal,
   many',
   many1',
@@ -355,10 +356,13 @@ import Data.ByteString.Builder (
   byteString, 
   char8,
   doubleDec,
-  integerDec
+  integerDec,
+  toLazyByteString,
+  word64Hex
   )
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as C
+import Data.ByteString.Lazy.Char8 (toStrict)
 import Prelude
 
 import           Hedgehog hiding (Command)
@@ -464,7 +468,7 @@ newtype Decimal = Decimal{ unDecimal :: Double }
 
 -- | Parse 'Decimal'
 parseDecimal :: Parser Decimal
-parseDecimal = double <* skipSpace
+parseDecimal = Decimal `fmap` double <* skipSpace
 
 -- | Unparse 'Decimal'
 unparseDecimal :: Decimal -> Builder
@@ -494,7 +498,8 @@ prop_hexadecimal_forward :: Property
 prop_hexadecimal_forward = property $ do
   n <- forAll $ Gen.integral $ Range.linear 0 (maxBound :: Int)
   let hex = Hexadecimal $ fromIntegral n
-  parseOnly parseHexadecimal (unparseHexadecimal hex) === Right hex
+      hexBs = toStrict $ toLazyByteString $ unparseHexadecimal hex
+  parseOnly parseHexadecimal hexBs === Right hex
 
 
 -- | @\<binary\> ::= #b followed by a non-empty sequence of 0 and 1 characters@
@@ -505,21 +510,21 @@ newtype Binary = Binary{ unBinary :: Integer }
 parseBinary :: Parser Binary
 parseBinary = "#b" *> Binary `fmap` binary <* skipSpace
   where
-    binary = T.foldl' step 0 `fmap` takeWhile1 isBinDigit
+    binary = C.foldl' step 0 `fmap` takeWhile1 isBinDigit
       where
         isBinDigit c = c == '0' || c == '1'
         step a c = (a `shiftL` 1) .|. fromIntegral (ord c - 48)
 
 -- | Unparse 'Binary'
 unparseBinary :: Binary -> Builder
-unparseBinary (Binary b) = byteString "#b" <> showbBin b
+unparseBinary (Binary b) = byteString "#b" <> undefined b
 
 -- | 'parseBinary' . 'unparseBinary' == id
 prop_binary_forward :: Property
 prop_binary_forward = property $ do
   n <- forAll $ Gen.integral $ Range.linear 0 (maxBound :: Int)
   let bin = Binary $ fromIntegral n
-  parseOnly parseBinary (unparseBinary bin) === Right bin
+  parseOnly parseBinary (toStrict $ toLazyByteString $ unparseBinary bin) === Right bin
 
 
 {- |
@@ -532,12 +537,12 @@ newtype SString = SString{ unSString :: ByteString }
   deriving (Show, Read, Eq)
 
 -- | Parse 'String'
-parseString :: Parser SString
-parseString = undefined <* skipSpace
+parseSString :: Parser SString
+parseSString = undefined <* skipSpace
 
 -- | Unparse 'String'
-unparseString :: SString -> Builder
-unparseString = byteString . unSString
+unparseSString :: SString -> Builder
+unparseSString = byteString . unSString
 
 
 {- |
@@ -620,7 +625,7 @@ data SpecConstant
   | -- | \<binary\>
     SpecConstantBinary Binary
   | -- | \<string\>
-    SpecConstantString String
+    SpecConstantString SString
   deriving (Show, Read, Eq)
 
 -- | Parse 'SpecConstant'
@@ -630,7 +635,7 @@ parseSpecConstant = choice
   , SpecConstantDecimal     <$> parseDecimal
   , SpecConstantHexadecimal <$> parseHexadecimal
   , SpecConstantBinary      <$> parseBinary
-  , SpecConstantString      <$> parseString
+  , SpecConstantString      <$> parseSString
   ]
 
 -- | Unparse 'SpecConstant'
@@ -640,7 +645,7 @@ unparseSpecConstant = \case
   SpecConstantDecimal     dec -> unparseDecimal     dec
   SpecConstantHexadecimal hex -> unparseHexadecimal hex
   SpecConstantBinary      bin -> unparseBinary      bin
-  SpecConstantString      str -> unparseString      str
+  SpecConstantString      str -> unparseSString     str
 
 
 {- |
@@ -1075,7 +1080,7 @@ unparseTerm = \case
   TermSpecConstant specConstant -> unparseSpecConstant specConstant
   TermQualIdentifier qualIdentifier -> unparseQualIdentifier qualIdentifier
   TermQualIdentifiers qualIdentifier terms ->
-    unwords B
+    unwordsB
       [ char8 '('
       , unparseQualIdentifier qualIdentifier
       , unwordsB $ unparseTerm <$> NE.toList terms
@@ -1137,9 +1142,9 @@ unparseTerm = \case
 
 -- | @\<sort_symbol_decl\> ::= ( \<identifier\> \<numeral\> \<attribute\>* )@
 data SortSymbolDecl = SortSymbolDecl
-  { sortSymbolDeclIdentifier  :: Identifier 
-  , sortSymbolDeclNumeral     :: Numeral 
-  , sortSymbolDeclsAttributes :: [Attribute]
+  { sortSymbolDeclIdentifier :: Identifier 
+  , sortSymbolDeclNumeral    :: Numeral 
+  , sortSymbolDeclAttributes :: [Attribute]
   }
   deriving (Show, Read, Eq)
 
@@ -1339,19 +1344,19 @@ data TheoryAttribute
     TheoryAttributeFuns (NonEmpty ParFunSymbolDecl)
 
   | -- | :sorts-description \<string\>
-    TheoryAttributeSortsDescription String
+    TheoryAttributeSortsDescription SString
 
   | -- | :funs-description \<string\>
-    TheoryAttributeFunsDescription String
+    TheoryAttributeFunsDescription SString
 
   | -- | :defintion \<string\>
-    TheoryAttributeDefinition String
+    TheoryAttributeDefinition SString
 
   | -- | :values \<string\>
-    TheoryAttributeValues String
+    TheoryAttributeValues SString
 
   | -- | :notes \<string\>
-    TheoryAttributeNotes String
+    TheoryAttributeNotes SString
 
   | -- | \<attribute\>
     TheoryAttributeAttribute Attribute
@@ -1364,9 +1369,9 @@ parseTheoryAttribute = choice
   , parseTheoryAttributeFuns
   , parseTheoryAttributeSortsDescription
   , parseTheoryAttributeFunsDescription
-  , ":definition" *> skipSpace >> TheoryAttributeDefinition <$> parseString
-  , ":values"     *> skipSpace >> TheoryAttributeValues     <$> parseString
-  , ":notes"      *> skipSpace >> TheoryAttributeNotes      <$> parseString
+  , ":definition" *> skipSpace >> TheoryAttributeDefinition <$> parseSString
+  , ":values"     *> skipSpace >> TheoryAttributeValues     <$> parseSString
+  , ":notes"      *> skipSpace >> TheoryAttributeNotes      <$> parseSString
   , TheoryAttributeAttribute <$> parseAttribute
   ]
   where
@@ -1384,10 +1389,10 @@ parseTheoryAttribute = choice
       return $ TheoryAttributeFuns parFunSymbolDecls
     parseTheoryAttributeSortsDescription = do
       ":sorts-description" *> skipSpace
-      TheoryAttributeSortsDescription <$> parseString
+      TheoryAttributeSortsDescription <$> parseSString
     parseTheoryAttributeFunsDescription = do
       ":funs-description" *> skipSpace
-      TheoryAttributeFunsDescription <$> parseString
+      TheoryAttributeFunsDescription <$> parseSString
 
 -- | Unparse 'TheoryAttribute'
 unparseTheoryAttribute :: TheoryAttribute -> Builder
@@ -1407,15 +1412,15 @@ unparseTheoryAttribute = \case
       , char8 ')'
       ]
   TheoryAttributeSortsDescription str ->
-    unwordsB [byteString ":sorts-description", unparseString str]
+    unwordsB [byteString ":sorts-description", unparseSString str]
   TheoryAttributeFunsDescription str ->
-    unwordsB [byteString ":funs-description", unparseString str]
+    unwordsB [byteString ":funs-description", unparseSString str]
   TheoryAttributeDefinition str ->
-    unwordsB [byteString ":definition", unparseString str]
+    unwordsB [byteString ":definition", unparseSString str]
   TheoryAttributeValues str ->
-    unwordsB [byteString ":values", unparseString str]
+    unwordsB [byteString ":values", unparseSString str]
   TheoryAttributeNotes str ->
-    unwordsB [byteString ":notes", unparseString str]
+    unwordsB [byteString ":notes", unparseSString str]
   TheoryAttributeAttribute attribute -> unparseAttribute attribute
 
 
@@ -1440,7 +1445,7 @@ parseTheoryDecl = do
 
 -- | Unparse 'TheoryDecl'
 unparseTheoryDecl :: TheoryDecl -> Builder
-unparseTheoryDecl (TheoryDecl symbol theoryAttributes) = T.unwords
+unparseTheoryDecl (TheoryDecl symbol theoryAttributes) = unwordsB
   [ char8 '('
   , byteString "theory"
   , unparseSymbol symbol
@@ -1468,16 +1473,16 @@ data LogicAttribute
     LogicAttributeTheories (NonEmpty Symbol)
 
   | -- | :language \<string\>
-    LogicAttributeLanguage String
+    LogicAttributeLanguage SString
 
   | -- | :extensions \<string\>
-    LogicAttributeExtensions String
+    LogicAttributeExtensions SString
 
   | -- | :values \<string\>
-    LogicAttributeValues String
+    LogicAttributeValues SString
 
   | -- | :notes \<string\>
-    LogicAttributeNotes String
+    LogicAttributeNotes SString
 
   | -- | \<attribute\>
     LogicAttributeAttribute Attribute
@@ -1487,10 +1492,10 @@ data LogicAttribute
 parseLogicAttribute :: Parser LogicAttribute
 parseLogicAttribute = choice
   [ parseLogicAttributeTheories
-  , ":language"   *> skipSpace >> LogicAttributeLanguage   <$> parseString
-  , ":extensions" *> skipSpace >> LogicAttributeExtensions <$> parseString
-  , ":values"     *> skipSpace >> LogicAttributeValues     <$> parseString
-  , ":notes"      *> skipSpace >> LogicAttributeNotes      <$> parseString
+  , ":language"   *> skipSpace >> LogicAttributeLanguage   <$> parseSString
+  , ":extensions" *> skipSpace >> LogicAttributeExtensions <$> parseSString
+  , ":values"     *> skipSpace >> LogicAttributeValues     <$> parseSString
+  , ":notes"      *> skipSpace >> LogicAttributeNotes      <$> parseSString
   , LogicAttributeAttribute <$> parseAttribute
   ]
   where
@@ -1643,7 +1648,7 @@ unparseBValue (BValue False) = byteString "false"
 -}
 data Option
   = -- | :diagnostic-output-channel \<string\>
-    OptionDiagnosticOutputChannel String
+    OptionDiagnosticOutputChannel SString
 
   | -- | :global-declarations \<b_value\>
     OptionGlobalDeclarations BValue
@@ -1676,7 +1681,7 @@ data Option
     OptionRandomSeed Numeral
 
   | -- | :regular-output-channel \<string\>
-    OptionRegularOutputChannel String
+    OptionRegularOutputChannel SString
 
   | -- | :reproducible-resource-limit \<numeral\>
     OptionReproducibleResourceLimit Numeral
@@ -1692,7 +1697,7 @@ data Option
 parseOption :: Parser Option
 parseOption = choice
   [ ":diagnostic-output-channel"       *>
-      OptionDiagnosticOutputChannel   `fmap` parseString
+      OptionDiagnosticOutputChannel   `fmap` parseSString
   , ":global-declarations"             *>
       OptionGlobalDeclarations        `fmap` parseBValue
   , ":interactive-mode"                *>
@@ -1714,7 +1719,7 @@ parseOption = choice
   , ":random-seed"                     *>
       OptionRandomSeed                `fmap` parseNumeral
   , ":regular-output-channel"          *>
-      OptionRegularOutputChannel      `fmap` parseString
+      OptionRegularOutputChannel      `fmap` parseSString
   , ":reproducible-resource-limit"     *>
       OptionReproducibleResourceLimit `fmap` parseNumeral
   , ":verbosity"                       *>
@@ -1726,33 +1731,33 @@ parseOption = choice
 unparseOption :: Option -> Builder
 unparseOption = \case
   OptionDiagnosticOutputChannel   str ->
-    unwordsB [byteString ":diagnostic-output-channel"  , unparseString  str]
+    unwordsB [byteString ":diagnostic-output-channel"  , unparseSString  str]
   OptionGlobalDeclarations        b   ->
-    unwordsB [byteString ":global-declarations"        , unparseBValue  b  ]
+    unwordsB [byteString ":global-declarations"        , unparseBValue  b   ]
   OptionInteractiveMode           b   ->
-    unwordsB [byteString ":interactive-mode"           , unparseBValue  b  ]
+    unwordsB [byteString ":interactive-mode"           , unparseBValue  b   ]
   OptionPrintSuccess              b   ->
-    unwordsB [byteString ":print-success"              , unparseBValue  b  ]
+    unwordsB [byteString ":print-success"              , unparseBValue  b   ]
   OptionProduceAssertions         b   ->
-    unwordsB [byteString ":produce-assertions"         , unparseBValue  b  ]
+    unwordsB [byteString ":produce-assertions"         , unparseBValue  b   ]
   OptionProduceAssignments        b   ->
-    unwordsB [byteString ":produce-assignments"        , unparseBValue  b  ]
+    unwordsB [byteString ":produce-assignments"        , unparseBValue  b   ]
   OptionProduceModels             b   ->
-    unwordsB [byteString ":produce-models"             , unparseBValue  b  ]
+    unwordsB [byteString ":produce-models"             , unparseBValue  b   ]
   OptionProduceProofs             b   ->
-    unwordsB [byteString ":produce-proofs"             , unparseBValue  b  ]
+    unwordsB [byteString ":produce-proofs"             , unparseBValue  b   ]
   OptionProduceUnsatAssumptions   b   ->
-    unwordsB [byteString ":produce-unsat-assumptions"  , unparseBValue  b  ]
+    unwordsB [byteString ":produce-unsat-assumptions"  , unparseBValue  b   ]
   OptionProduceUnsatCores         b   ->
-    unwordsB [byteString ":produce-unsat-cores"        , unparseBValue  b  ]
+    unwordsB [byteString ":produce-unsat-cores"        , unparseBValue  b   ]
   OptionRandomSeed                n   ->
-    unwordsB [byteString ":random-seed"                , unparseNumeral n  ]
+    unwordsB [byteString ":random-seed"                , unparseNumeral n   ]
   OptionRegularOutputChannel      str ->
-    unwordsB [byteString ":regular-output-channel"     , unparseString  str]
+    unwordsB [byteString ":regular-output-channel"     , unparseSString  str]
   OptionReproducibleResourceLimit n   ->
-    unwordsB [byteString ":reproducible-resource-limit", unparseNumeral n  ]
+    unwordsB [byteString ":reproducible-resource-limit", unparseNumeral n   ]
   OptionVerbosity                 n   ->
-    unwordsB [byteString ":verbosity"                  , unparseNumeral n  ]
+    unwordsB [byteString ":verbosity"                  , unparseNumeral n   ]
   OptionAttribute attribute -> unparseAttribute attribute
 
 --------------
@@ -2052,7 +2057,7 @@ data Command
   | -- | ( define-sort \<symbol\> ( \<symbol\>* ) \<sort\> )
     DefineSort Symbol [Symbol] Sort
   | -- | ( echo \<string\> )
-    Echo String
+    Echo SString
   | -- | ( exit )
     Exit
   | -- | ( get-assertions )
@@ -2221,7 +2226,7 @@ parseCommand = choice
     parseEcho = do
       par '('
       "echo" *> skipSpace
-      str <- parseString
+      str <- parseSString
       par ')'
       return $ Echo str
     parseExit = do
@@ -2428,7 +2433,7 @@ unparseCommand = \case
     unwordsB 
       [ char8 '('
       , byteString "echo"
-      , unparseString str
+      , unparseSString str
       , char8 ')'
       ]
   Exit -> byteString "( exit )"
@@ -2530,10 +2535,10 @@ parseErrorBehavior = choice
   ] <* skipSpace
 
 -- | Unparse 'ErrorBehavior'
-unparseErrorBehavior :: ErrorBehavior -> Text
+unparseErrorBehavior :: ErrorBehavior -> Builder
 unparseErrorBehavior = \case
-  ImmediateExit      -> "immediate-exit"
-  ContinuedExecution -> "continued-execution"
+  ImmediateExit      -> byteString "immediate-exit"
+  ContinuedExecution -> byteString "continued-execution"
 
 
 -- | @\<reason-unknown\> ::= memout | incomplete | \<s_expr\>@
@@ -2551,10 +2556,10 @@ parseReasonUnknown = choice
   ] <* skipSpace
 
 -- | Unparse 'ReasonUnknown'
-unparseReasonUnknown :: ReasonUnknown -> Text
+unparseReasonUnknown :: ReasonUnknown -> Builder
 unparseReasonUnknown = \case
-  Memout              -> "memout"
-  Incomplete          -> "incomplete"
+  Memout              -> byteString "memout"
+  Incomplete          -> byteString "incomplete"
   ReasonUnknown sexpr -> unparseSExpr sexpr
 
 
@@ -2607,23 +2612,33 @@ parseModelResponse = choice
       return $ ModelResponseDefineFunsRec $ NE.zip functionDecs terms
 
 -- | Unparse 'ModelResponse'
-unparseModelResponse :: ModelResponse -> Text
+unparseModelResponse :: ModelResponse -> Builder
 unparseModelResponse = \case
   ModelResponseDefineFun functionDef ->
-    T.unwords ["(", "define-fun", unparseFunctionDef functionDef, ")"]
+    unwordsB
+      [ char8 '('
+      , byteString "define-fun"
+      , unparseFunctionDef functionDef
+      , char8 ')'
+      ]
   ModelResponseDefineFunRec functionDef ->
-    T.unwords ["(", "define-fun-rec", unparseFunctionDef functionDef, ")"]
+    unwordsB
+      [ char8 '('
+      , byteString "define-fun-rec"
+      , unparseFunctionDef functionDef
+      , char8 ')'
+      ]
   ModelResponseDefineFunsRec functionDecsTerms ->
-    T.unwords 
-      [ "("
-      , "define-funs-rec"
-      , "("
-      , T.unwords $ unparseFunctionDec . fst <$> NE.toList functionDecsTerms
-      , ")"
-      , "("
-      , T.unwords $ unparseTerm . snd <$> NE.toList functionDecsTerms
-      , ")"
-      , ")"
+    unwordsB
+      [ char8 '('
+      , byteString "define-funs-rec"
+      , char8 '('
+      , unwordsB $ unparseFunctionDec . fst <$> NE.toList functionDecsTerms
+      , char8 ')'
+      , char8 '('
+      , unwordsB $ unparseTerm . snd <$> NE.toList functionDecsTerms
+      , char8 ')'
+      , char8 ')'
       ]
 
 
@@ -2642,15 +2657,15 @@ data InfoResponse
   = -- | :assertion-stack-levels \<numeral\>
     InfoResponseAssertionStackLevels Numeral
   | -- | :authors \<string\>
-    InfoResponseAuthors String
+    InfoResponseAuthors SString
   | -- | :error-behavior \<error-behavior\>
     InfoResponseErrorBehavior ErrorBehavior
   | -- | :name \<string\>
-    InfoResponseName String
+    InfoResponseName SString
   | -- | :reason-unknown \<reason-unknown\>
     InfoResponseReasonUnknown ReasonUnknown
   | -- | :version \<string\>
-    InfoResponseVersion String
+    InfoResponseVersion SString
   | -- | \<attribute\>
     InfoResponseAttribute Attribute
   deriving (Show, Read, Eq)
@@ -2659,11 +2674,11 @@ data InfoResponse
 parseInfoResponse :: Parser InfoResponse
 parseInfoResponse = choice
   [ parseInfoResponseAssertionStackLevels
-  , ":authors" *> skipSpace >> InfoResponseAuthors <$> parseString
+  , ":authors" *> skipSpace >> InfoResponseAuthors <$> parseSString
   , parseInfoResponseErrorBehavior
-  , ":name" *> skipSpace >> InfoResponseName <$> parseString
+  , ":name" *> skipSpace >> InfoResponseName <$> parseSString
   , parseInfoResponseReasonUnknown
-  , ":version" *> skipSpace >> InfoResponseVersion <$> parseString
+  , ":version" *> skipSpace >> InfoResponseVersion <$> parseSString
   , InfoResponseAttribute <$> parseAttribute
   ]
   where
@@ -2678,27 +2693,30 @@ parseInfoResponse = choice
       InfoResponseReasonUnknown <$> parseReasonUnknown
 
 -- | Unparse 'InfoResponse'
-unparseInfoResponse :: InfoResponse -> Text
+unparseInfoResponse :: InfoResponse -> Builder
 unparseInfoResponse = \case
   InfoResponseAssertionStackLevels num ->
-      T.unwords [":assertion-stack-levels", unparseNumeral num]
+    unwordsB [byteString ":assertion-stack-levels", unparseNumeral num]
   InfoResponseAuthors str ->
-      T.unwords [":authors", unparseString str]
+    unwordsB [byteString ":authors", unparseSString str]
   InfoResponseErrorBehavior errorBehavior ->
-      T.unwords [":error-behavior", unparseErrorBehavior errorBehavior]
+    unwordsB [byteString":error-behavior", unparseErrorBehavior errorBehavior]
   InfoResponseName str ->
-      T.unwords [":name", unparseString str]
+    unwordsB [byteString ":name", unparseSString str]
   InfoResponseReasonUnknown reasonUnknown ->
-      T.unwords [":reason-unknown", unparseReasonUnknown reasonUnknown]
+    unwordsB [byteString ":reason-unknown", unparseReasonUnknown reasonUnknown]
   InfoResponseVersion str -> 
-      T.unwords [":version", unparseString str]
+    unwordsB [byteString ":version", unparseSString str]
   InfoResponseAttribute attribute ->
-      unparseAttribute attribute
+    unparseAttribute attribute
 
 
 -- | @\<valuation_pair\> ::= ( \<term\> \<term\> )@
-data ValuationPair = ValuationPair Term Term
-    deriving (Show, Read, Eq)
+data ValuationPair = ValuationPair
+  { valuationPairFst :: Term
+  , valuationPairSnd :: Term
+  }
+  deriving (Show, Read, Eq)
 
 -- | Parse 'ValuationPair'
 parseValuationPair :: Parser ValuationPair
@@ -2710,14 +2728,17 @@ parseValuationPair = do
   return $ ValuationPair t1 t2
 
 -- | Unparse 'ValuationPair'
-unparseValuationPair :: ValuationPair -> Text
+unparseValuationPair :: ValuationPair -> Builder
 unparseValuationPair (ValuationPair a b) = 
-  T.unwords ["(", unparseTerm a, unparseTerm b, ")"]
+  unwordsB [char8 '(', unparseTerm a, unparseTerm b, char8 ')']
 
 
 -- | @\<t_valuation_pair\> ::= ( \<symbol\> \<b_value\> )@
-data TValuationPair = TValuationPair Symbol BValue
-    deriving (Show, Read, Eq)
+data TValuationPair = TValuationPair
+  { tValuationPairSymbol :: Symbol
+  , tValuationPairBValue :: BValue
+  }
+  deriving (Show, Read, Eq)
 
 -- | Parse 'TValuationPair'
 parseTValuationPair :: Parser TValuationPair
@@ -2729,9 +2750,13 @@ parseTValuationPair = do
   return $ TValuationPair symbol bValue
 
 -- | Unparse 'TValuationPair'
-unparseTValuationPair :: TValuationPair -> Text
-unparseTValuationPair (TValuationPair symbol bValue) = 
-  T.unwords ["(", unparseSymbol symbol, unparseBValue bValue, ")"]
+unparseTValuationPair :: TValuationPair -> Builder
+unparseTValuationPair (TValuationPair symbol bValue) = unwordsB
+  [ char8 '('
+  , unparseSymbol symbol
+  , unparseBValue bValue
+  , char8 ')'
+  ]
 
 
 -- | @\<check_sat_response\> ::= sat | unsat | unknown@
@@ -2749,28 +2774,29 @@ parseCheckSatResponse = choice
   ] <* skipSpace
 
 -- | Unparse 'CheckSatResponse'
-unparseCheckSatResponse :: CheckSatResponse -> Text
-unparseCheckSatResponse = \case
+unparseCheckSatResponse :: CheckSatResponse -> Builder
+unparseCheckSatResponse = byteString . \case
   Sat     -> "sat"
   Unsat   -> "unsat"
   Unknown -> "unknown"
 
 
 -- | @\<echo_response\> ::= \<string\>@
-newtype EchoResponse = EchoResponse{ unEchoResponse :: String }
+newtype EchoResponse = EchoResponse{ unEchoResponse :: SString }
   deriving (Show, Read, Eq)
 
 -- | Parse 'EchoResponse'
 parseEchoResponse :: Parser EchoResponse
-parseEchoResponse = EchoResponse <$> parseString
+parseEchoResponse = EchoResponse <$> parseSString
 
 -- | Unparse 'EchoResponse'
-unparseEchoResponse :: EchoResponse -> Text
-unparseEchoResponse = unparseString . unEchoResponse
+unparseEchoResponse :: EchoResponse -> Builder
+unparseEchoResponse = unparseSString . unEchoResponse
 
 
 -- | @\<get_assertions_response\> ::= ( \<term\>* )@
-newtype GetAssertionsResponse = GetAssertionsResponse [Term]
+newtype GetAssertionsResponse = GetAssertionsResponse
+  { unGetAssertionsResponse :: [Term] }
   deriving (Show, Read, Eq)
 
 -- | Parse 'GetAssertionsResponse'
@@ -2782,13 +2808,17 @@ parseGetAssertionsResponse = do
   return $ GetAssertionsResponse terms
 
 -- | Unparse 'GetAssertionsResponse'
-unparseGetAssertionsResponse :: GetAssertionsResponse -> Text
-unparseGetAssertionsResponse (GetAssertionsResponse terms) =
-  T.unwords ["(", T.unwords $ unparseTerm <$> terms, ")"]
+unparseGetAssertionsResponse :: GetAssertionsResponse -> Builder
+unparseGetAssertionsResponse (GetAssertionsResponse terms) = unwordsB
+  [ char8 '('
+  , unwordsB $ unparseTerm <$> terms
+  , char8 ')'
+  ]
 
 
 -- | @\<get_assignment_response\> ::= ( \<t_valuation_pair\>* )@
-newtype GetAssignmentResponse = GetAssignmentResponse [TValuationPair]
+newtype GetAssignmentResponse = GetAssignmentResponse
+  { unGetAssignmentResponse :: [TValuationPair] }
   deriving (Show, Read, Eq)
 
 -- | Parse 'GetAssignmentResponse'
@@ -2800,13 +2830,17 @@ parseGetAssignmentResponse = do
   return $ GetAssignmentResponse tValuationPairs
 
 -- | Unparse 'GetAssignmentResponse'
-unparseGetAssignmentResponse :: GetAssignmentResponse -> Text
-unparseGetAssignmentResponse (GetAssignmentResponse tValuationPairs) =
-  T.unwords ["(", T.unwords $ unparseTValuationPair <$> tValuationPairs, ")"]
+unparseGetAssignmentResponse :: GetAssignmentResponse -> Builder
+unparseGetAssignmentResponse (GetAssignmentResponse tValuationPairs) = unwordsB
+  [ char8 '('
+  , unwordsB $ unparseTValuationPair <$> tValuationPairs
+  , char8 ')'
+  ]
 
 
 -- | @\<get_info_response\> ::= ( \<info_response\>+ )@
-newtype GetInfoResponse = GetInfoResponse (NonEmpty InfoResponse)
+newtype GetInfoResponse = GetInfoResponse
+  { unGetInfoResponse :: NonEmpty InfoResponse }
   deriving (Show, Read, Eq)
 
 -- | Parse 'GetInfoResponse'
@@ -2818,17 +2852,17 @@ parseGetInfoResponse = do
   return $ GetInfoResponse infoResponses
 
 -- | Unparse 'GetInfoResponse'
-unparseGetInfoResponse :: GetInfoResponse -> Text
-unparseGetInfoResponse (GetInfoResponse infoResponses) = 
-  T.unwords 
-    [ "("
-    , T.unwords $ unparseInfoResponse <$> NE.toList infoResponses
-    , ")"
-    ] 
+unparseGetInfoResponse :: GetInfoResponse -> Builder
+unparseGetInfoResponse (GetInfoResponse infoResponses) = unwordsB 
+  [ char8 '('
+  , unwordsB $ unparseInfoResponse <$> NE.toList infoResponses
+  , char8 ')'
+  ] 
 
 
 -- | @\<get_model_response\> ::= ( \<model_response\>* )@
-newtype GetModelResponse = GetModelResponse [ModelResponse]
+newtype GetModelResponse = GetModelResponse
+  { unGetModelResponse :: [ModelResponse] }
   deriving (Show, Read, Eq)
 
 -- | Parse 'GetModelResponse'
@@ -2840,13 +2874,17 @@ parseGetModelResponse = do
   return $ GetModelResponse modelResponses
 
 -- | Unparse 'GetModelResponse'
-unparseGetModelResponse :: GetModelResponse -> Text
-unparseGetModelResponse (GetModelResponse modelResponses) =
-  T.unwords ["(", T.unwords $ unparseModelResponse <$> modelResponses, ")"]
+unparseGetModelResponse :: GetModelResponse -> Builder
+unparseGetModelResponse (GetModelResponse modelResponses) = unwordsB
+  [ char8 '('
+  , unwordsB $ unparseModelResponse <$> modelResponses
+  , char8 ')'
+  ]
 
 
 -- | @\<get_option_response\> ::= \<attribute_value\>@
-newtype GetOptionResponse = GetOptionResponse AttributeValue
+newtype GetOptionResponse = GetOptionResponse
+  { unGetOptionResponse :: AttributeValue }
   deriving (Show, Read, Eq)
 
 -- | Parse 'GetOptionResponse'
@@ -2854,13 +2892,14 @@ parseGetOptionResponse :: Parser GetOptionResponse
 parseGetOptionResponse = GetOptionResponse <$> parseAttributeValue
 
 -- | Unparse 'GetOptionResponse'
-unparseGetOptionResponse :: GetOptionResponse -> Text
+unparseGetOptionResponse :: GetOptionResponse -> Builder
 unparseGetOptionResponse (GetOptionResponse attributeValue) =
   unparseAttributeValue attributeValue
 
 
 -- | @\<get_proof_response\> ::= \<s_expr\>@
-newtype GetProofResponse = GetProofResponse SExpr
+newtype GetProofResponse = GetProofResponse
+  { unGetProofResponse :: SExpr }
   deriving (Show, Read, Eq)
 
 -- | Parse 'GetProofResponse'
@@ -2868,12 +2907,13 @@ parseGetProofResponse :: Parser GetProofResponse
 parseGetProofResponse = GetProofResponse <$> parseSExpr
 
 -- | Unparse 'GetProofResponse'
-unparseGetProofResponse :: GetProofResponse -> Text
+unparseGetProofResponse :: GetProofResponse -> Builder
 unparseGetProofResponse (GetProofResponse expr) = unparseSExpr expr
 
 
 -- | @\<get_unsat_assumptions_response\> ::= ( \<symbol\>* )@
-newtype GetUnsatAssumptionsResponse = GetUnsatAssumptionsResponse [Symbol]
+newtype GetUnsatAssumptionsResponse = GetUnsatAssumptionsResponse
+  { unGetUnsatAssumptionsResponse :: [Symbol] }
   deriving (Show, Read, Eq)
 
 -- | Parse 'GetUnsatAssumptionsResponse'
@@ -2885,13 +2925,17 @@ parseGetUnsatAssumptionsResponse = do
   return $ GetUnsatAssumptionsResponse symbols
 
 -- | Unparse 'GetUnsatAssumptionsResponse'
-unparseGetUnsatAssumptionsResponse :: GetUnsatAssumptionsResponse -> Text
-unparseGetUnsatAssumptionsResponse (GetUnsatAssumptionsResponse r) =
-  T.unwords ["(", T.unwords $ unparseSymbol <$> r, ")"]
+unparseGetUnsatAssumptionsResponse :: GetUnsatAssumptionsResponse -> Builder
+unparseGetUnsatAssumptionsResponse (GetUnsatAssumptionsResponse r) = unwordsB
+  [ char8 '('
+  , unwordsB $ unparseSymbol <$> r
+  , char8 ')'
+  ]
 
 
 -- | @\<get_unsat_core_response\> ::= ( \<symbol\>* )@
-newtype GetUnsatCoreResponse = GetUnsatCoreResponse [Symbol]
+newtype GetUnsatCoreResponse = GetUnsatCoreResponse
+  { unGetUnsatCoreResponses :: [Symbol] }
   deriving (Show, Read, Eq)
 
 -- | Parse 'GetUnsatCoreResponse'
@@ -2903,14 +2947,18 @@ parseGetUnsatCoreResponse = do
   return $ GetUnsatCoreResponse symbols
 
 -- | Unparse 'GetUnsatCoreResponse'
-unparseGetUnsatCoreResponse :: GetUnsatCoreResponse -> Text
-unparseGetUnsatCoreResponse (GetUnsatCoreResponse symbols) =
-  T.unwords ["(", T.unwords $ unparseSymbol <$> symbols, ")"]
+unparseGetUnsatCoreResponse :: GetUnsatCoreResponse -> Builder
+unparseGetUnsatCoreResponse (GetUnsatCoreResponse symbols) = unwordsB
+  [ char8 '('
+  , unwordsB $ unparseSymbol <$> symbols
+  , char8 ')'
+  ]
 
 
 -- | @\<get_value_response\> ::= ( \<valuation_pair\>+ )@
-newtype GetValueResponse = GetValueResponse (NonEmpty ValuationPair)
-    deriving (Show, Read, Eq)
+newtype GetValueResponse = GetValueResponse
+  { unGetValueResponse :: NonEmpty ValuationPair }
+  deriving (Show, Read, Eq)
 
 -- | Parse 'GetValueResponse'
 parseGetValueResponse :: Parser GetValueResponse
@@ -2921,13 +2969,12 @@ parseGetValueResponse = do
   return $ GetValueResponse valuationPairs
 
 -- | Unparse 'GetValueResponse'
-unparseGetValueResponse :: GetValueResponse -> Text
-unparseGetValueResponse (GetValueResponse valuationPairs) =
-  T.unwords
-    [ "("
-    , T.unwords $ unparseValuationPair <$> NE.toList valuationPairs
-    , ")"
-    ]
+unparseGetValueResponse :: GetValueResponse -> Builder
+unparseGetValueResponse (GetValueResponse valuationPairs) = unwordsB
+  [ char8 '('
+  , unwordsB $ unparseValuationPair <$> NE.toList valuationPairs
+  , char8 ')'
+  ]
 
 
 {- |
@@ -2987,7 +3034,7 @@ parseSpecificSuccessResponse = choice
   ]
 
 -- | Unparse 'SpecificSuccessResponse'
-unparseSpecificSuccessResponse :: SpecificSuccessResponse -> Text
+unparseSpecificSuccessResponse :: SpecificSuccessResponse -> Builder
 unparseSpecificSuccessResponse = \case
   SpecificSuccessResponseCheckSatResponse checkSatResponse ->
     unparseCheckSatResponse checkSatResponse
@@ -3028,7 +3075,7 @@ data GeneralResponse
   | -- | unsupported
     GeneralResponseUnsupported
   | -- | ( error \<string\> )
-    GeneralResponseError String
+    GeneralResponseError SString
   deriving (Show, Read, Eq)
 
 -- | Parse 'GeneralResponse'
@@ -3043,19 +3090,24 @@ parseGeneralResponse = choice
     parseGeneralResponseError = do
       par '('
       "error" *> skipSpace
-      str <- parseString
+      str <- parseSString
       par ')'
       return $ GeneralResponseError str
 
 -- | Unparse 'GeneralResponse'
-unparseGeneralResponse :: GeneralResponse -> Text
+unparseGeneralResponse :: GeneralResponse -> Builder
 unparseGeneralResponse = \case
-  GeneralResponseSuccess -> "success"
+  GeneralResponseSuccess -> byteString "success"
   GeneralResponseSpecificSuccessResponse specificSuccessResponse ->
     unparseSpecificSuccessResponse specificSuccessResponse
-  GeneralResponseUnsupported -> "unsupported"
+  GeneralResponseUnsupported -> byteString "unsupported"
   GeneralResponseError str ->
-    T.unwords ["(", "error", unparseString str, ")"]
+    unwordsB
+      [ char8 '('
+      , byteString "error"
+      , unparseSString str
+      , char8 ')'
+      ]
 
 
 syntaxTests :: IO Bool
