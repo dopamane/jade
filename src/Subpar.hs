@@ -25,10 +25,9 @@ module Subpar (
 
 import Control.Monad (forM)
 import Data.Attoparsec.ByteString.Char8 (Result, parseWith)
-import Data.ByteString.Builder (hPutBuilder)
+import Data.ByteString.Builder (hPutBuilder, char8)
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as C
-import qualified Data.ByteString.Lazy.Char8 as CL
 import System.IO (hReady)
 
 import Subpar.Process
@@ -46,7 +45,8 @@ transmit_ hndl = mapM_ (send hndl)
 
 -- | Send 'Command' to 'SmtHandle'. See 'transmit' and 'transmit_'.
 send :: SmtHandle -> Command -> IO ()
-send hndl = hPutBuilder (smtIn hndl) . unparseCommand
+send hndl cmd = do
+  hPutBuilder (smtIn hndl) $ unparseCommand cmd <> char8 '\n'
 
 -- | Receive line of 'ByteString' from 'SmtHandle'. 'recv' first checks
 -- if there is at least one item available for input from the handle using
