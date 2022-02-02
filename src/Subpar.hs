@@ -45,8 +45,7 @@ transmit_ hndl = mapM_ (send hndl)
 
 -- | Send 'Command' to 'SmtHandle'. See 'transmit' and 'transmit_'.
 send :: SmtHandle -> Command -> IO ()
-send hndl cmd = do
-  hPutBuilder (smtIn hndl) $ unparseCommand cmd <> char8 '\n'
+send hndl cmd = hPutBuilder (smtIn hndl) $ unparseCommand cmd <> char8 '\n'
 
 -- | Receive line of 'ByteString' from 'SmtHandle'. 'recv' first checks
 -- if there is at least one item available for input from the handle using
