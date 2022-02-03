@@ -345,11 +345,16 @@ import Data.Attoparsec.ByteString.Char8 (
   decimal,
   double,
   hexadecimal,
+  isAlpha_iso8859_15,
+  isDigit,
+  isSpace,
   many',
   many1',
   parseOnly,
+  satisfy,
   skipSpace,
   string,
+  takeWhile,
   takeWhile1
   )
 import Data.Bits ((.|.), shiftL)
@@ -369,7 +374,7 @@ import Data.ByteString.Builder (
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as C
 import Data.ByteString.Lazy.Char8 (toStrict)
-import Prelude
+import Prelude hiding (takeWhile)
 
 import           Hedgehog hiding (Command)
 import qualified Hedgehog.Gen   as Gen
@@ -545,8 +550,22 @@ newtype SString = SString{ unSString :: ByteString }
 
 -- | Parse 'String'
 parseSString :: Parser SString
-parseSString = undefined <* skipSpace
-
+parseSString = undefined
+{-
+parseSString = char '"' *> SString `fmap` escaped <* char '"' <* skipSpace
+  where
+    normal = takeWhile $ \c -> isAlpha_iso8859_15 c || isSpace c
+    escaped = do
+      r <- normal
+      rs <- many' escaped'
+      return $ concat $ r:rs
+      where
+        escaped' = do
+          r1 <- normal
+          r2 <- quoted
+          return $ r1 <> r2
+    quoted = undefined
+-}
 -- | Unparse 'String'
 unparseSString :: SString -> Builder
 unparseSString = byteString . unSString
@@ -563,8 +582,29 @@ newtype SimpleSymbol = SimpleSymbol{ unSimpleSymbol :: ByteString }
 
 -- | Parse 'SimpleSymbol'
 parseSimpleSymbol :: Parser SimpleSymbol
-parseSimpleSymbol = undefined <* skipSpace
-
+parseSimpleSymbol = do
+  c  <- satisfy $ \c -> not (isDigit c) && isSimpleChar c
+  cs <- takeWhile isSimpleChar
+  return $ SimpleSymbol $ c `C.cons` cs
+  where
+    isSimpleChar c = isDigit c || isAlpha_iso8859_15 c || isSpecial c
+    isSpecial c =    c == '+'
+                  || c == '-'
+                  || c == '/'
+                  || c == '*'
+                  || c == '='
+                  || c == '%'
+                  || c == '?'
+                  || c == '!'
+                  || c == '.'
+                  || c == '$'
+                  || c == '_'
+                  || c == '~'
+                  || c == '^'
+                  || c == '<'
+                  || c == '>'
+                  || c == '@'
+                  
 -- | Unparse 'SimpleSymbol'
 unparseSimpleSymbol :: SimpleSymbol -> Builder
 unparseSimpleSymbol = byteString . unSimpleSymbol
@@ -577,19 +617,22 @@ unparseSimpleSymbol = byteString . unSimpleSymbol
              and ends with | and does not otherwise include | or \
 @
 -}
-newtype Symbol = Symbol{ unSymbol :: ByteString }
+data Symbol = SymbolSimpleSymbol SimpleSymbol
+            | SymbolQuoted ByteString
   deriving (Show, Read, Eq)
 
 -- | Parse 'Symbol'
 parseSymbol :: Parser Symbol
 parseSymbol = choice
-  [ undefined 
-  , char '|' *> undefined <* char '|'
-  ] <* skipSpace
+  [ SymbolSimpleSymbol <$> parseSimpleSymbol 
+  , char '|' *> SymbolQuoted `fmap` undefined <* char '|' <* skipSpace
+  ]
 
 -- | Unparse 'Symbol'
 unparseSymbol :: Symbol -> Builder
-unparseSymbol = byteString . unSymbol
+unparseSymbol = \case
+  SymbolSimpleSymbol simpleSymbol -> unparseSimpleSymbol simpleSymbol
+  SymbolQuoted quote -> char8 '|' <> byteString quote <> char8 '|'
 
 
 -- | @\<keyword\> ::= :\<simple_symbol\>@
