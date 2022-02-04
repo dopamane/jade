@@ -29,38 +29,37 @@ import System.IO (
 
 main :: IO ()
 main = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
-  hSetBinaryMode (smtIn smtHandle) True
+  hSetBinaryMode (smtIn  smtHandle) True
   hSetBinaryMode (smtOut smtHandle) True
-  hSetBuffering (smtIn  smtHandle) LineBuffering
-  hSetBuffering (smtOut smtHandle) LineBuffering
+  hSetBuffering  (smtIn  smtHandle) LineBuffering
+  hSetBuffering  (smtOut smtHandle) LineBuffering
   let printSuccess = SetOption $ OptionPrintSuccess $ BValue True
       setSmtLibVer = SetInfo $
                        AttributeKeywordAttributeValue
                          (Keyword $ SimpleSymbol "smt-lib-version")
-                         (AttributeValueSymbol $ Symbol "2.6")
-      setLogicQFLIA = SetLogic $ Symbol "QF_LIA"
-      declareConstWInt = DeclareConst
-                           (Symbol "w")
-                           (Sort (IdentifierSymbol $ Symbol "Int") [])
-      declareConstXInt = DeclareConst
-                           (Symbol "x")
-                           (Sort (IdentifierSymbol $ Symbol "Int") [])
-      declareConstYInt = DeclareConst
-                           (Symbol "y")
-                           (Sort (IdentifierSymbol $ Symbol "Int") [])
-      declareConstZInt = DeclareConst
-                           (Symbol "z")
-                           (Sort (IdentifierSymbol $ Symbol "Int") [])
+                         (AttributeValueSymbol $ 
+                           SymbolSimpleSymbol $ SimpleSymbol "2.6"
+                         )
+      setLogicQFLIA = SetLogic $ SymbolSimpleSymbol $ SimpleSymbol "QF_LIA"
+      declareConst sym srt = DeclareConst
+                               (SymbolSimpleSymbol $ SimpleSymbol sym)
+                               (Sort 
+                                 (IdentifierSymbol $ 
+                                   SymbolSimpleSymbol $ SimpleSymbol srt
+                                 )
+                                 []
+                               )
+      
       assertXGtY = undefined
   transmit 
     smtHandle 
     [ printSuccess
     , setSmtLibVer
     , setLogicQFLIA
-    , declareConstWInt
-    , declareConstXInt
-    , declareConstYInt
-    , declareConstZInt
+    , declareConst "w" "Int"
+    , declareConst "x" "Int"
+    , declareConst "y" "Int"
+    , declareConst "z" "Int"
     ] >>= mapM_ printResult
   transmit_ smtHandle [Exit]
   -- print $ toLazyByteString $ unparseCommand declareConstWInt

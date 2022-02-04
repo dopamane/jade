@@ -3112,9 +3112,9 @@ data GeneralResponse
 parseGeneralResponse :: Parser GeneralResponse
 parseGeneralResponse = choice
   [ GeneralResponseSuccess <$ string "success"
-  -- , GeneralResponseSpecificSuccessResponse <$> parseSpecificSuccessResponse
+  , GeneralResponseSpecificSuccessResponse <$> parseSpecificSuccessResponse
   , GeneralResponseUnsupported <$ string "unsupported"
-  -- , parseGeneralResponseError
+  , parseGeneralResponseError
   ] <* skipSpace
   where
     parseGeneralResponseError = do
