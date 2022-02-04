@@ -528,8 +528,17 @@ parseBinary = "#b" *> Binary `fmap` binary <* skipSpace
 
 -- | Unparse 'Binary'
 unparseBinary :: Binary -> Builder
-unparseBinary (Binary b) = byteString "#b" <> undefined b
-{-
+unparseBinary (Binary bin) = byteString "#b" <> encodeBin bin
+  where
+    encodeBin :: Integer -> Builder -- messy, i'd prefer a direct encoding
+    encodeBin 0 = char8 '0'
+    encodeBin p = go p
+      where 
+        go 0 = mempty
+        go n = let (n', r) = n `divMod` 2
+                   b = if r == 1 then '1' else '0'
+               in go n' <> char8 b
+
 -- | 'parseBinary' . 'unparseBinary' == id
 prop_binary_forward :: Property
 prop_binary_forward = property $ do
@@ -537,7 +546,7 @@ prop_binary_forward = property $ do
   let bin   = Binary $ fromIntegral n
       binBs = toStrict $ toLazyByteString $ unparseBinary bin
   parseOnly parseBinary binBs === Right bin
--}
+
 
 {- |
 @
