@@ -557,27 +557,29 @@ quotes with escape sequence ""
 newtype SString = SString{ unSString :: ByteString }
   deriving (Show, Read, Eq)
 
--- | Parse 'String'
+-- | Parse 'SString'.
+-- See [StackOverflow thread](https://stackoverflow.com/a/35302838/4051020).
 parseSString :: Parser SString
-parseSString = undefined
-{-
 parseSString = char '"' *> SString `fmap` escaped <* char '"' <* skipSpace
   where
-    normal = takeWhile $ \c -> isAlpha_iso8859_15 c || isSpace c
+    normal = takeWhile $ (/= '"')
     escaped = do
       r <- normal
       rs <- many' escaped'
-      return $ concat $ r:rs
+      return $ C.concat $ r:rs
       where
         escaped' = do
           r1 <- normal
           r2 <- quoted
           return $ r1 <> r2
-    quoted = undefined
--}
--- | Unparse 'String'
+    quoted = do
+      _ <- string "\"\""
+      res <- normal
+      return $ "\"\"" <> res
+
+-- | Unparse 'SString'
 unparseSString :: SString -> Builder
-unparseSString = byteString . unSString
+unparseSString (SString str) = char8 '"' <> byteString str <> char8 '"'
 
 
 {- |
@@ -634,7 +636,8 @@ data Symbol = SymbolSimpleSymbol SimpleSymbol
 parseSymbol :: Parser Symbol
 parseSymbol = choice
   [ SymbolSimpleSymbol <$> parseSimpleSymbol 
-  , char '|' *> SymbolQuoted `fmap` undefined <* char '|' <* skipSpace
+  , -- what about '/'?
+    char '|' *> SymbolQuoted `fmap` takeWhile (/= '|') <* char '|' <* skipSpace
   ]
 
 -- | Unparse 'Symbol'
