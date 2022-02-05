@@ -37,7 +37,7 @@ import Subpar.Syntax
 transmit :: SmtHandle -> [Command] -> IO [Result GeneralResponse]
 transmit hndl cmds = forM cmds $ \cmd -> do
   send hndl cmd
-  parseWith (recv hndl) parseGeneralResponse =<< C.hGetLine (smtOut hndl)
+  parseWith (recv hndl) (parseGeneralResponse cmd) =<< C.hGetLine (smtOut hndl)
 
 -- | Send 'Command's without receiving 'GeneralResponse's.
 transmit_ :: SmtHandle -> [Command] -> IO ()

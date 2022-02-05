@@ -3048,20 +3048,33 @@ data SpecificSuccessResponse
   deriving (Show, Read, Eq)
 
 -- | Parse 'SpecificSuccessResponse'
-parseSpecificSuccessResponse :: Parser SpecificSuccessResponse
-parseSpecificSuccessResponse = choice
-  [ SpecificSuccessResponseCheckSatResponse <$> parseCheckSatResponse
-  , SpecificSuccessResponseEchoResponse <$> parseEchoResponse
-  , SpecificSuccessResponseGetAssertionsResponse <$> parseGetAssertionsResponse
-  , SpecificSuccessResponseGetAssignmentResponse <$> parseGetAssignmentResponse
-  , SpecificSuccessResponseGetInfoResponse <$> parseGetInfoResponse
-  , SpecificSuccessResponseGetModelResponse <$> parseGetModelResponse
-  , SpecificSuccessResponseGetOptionResponse <$> parseGetOptionResponse
-  , SpecificSuccessResponseGetProofResponse <$> parseGetProofResponse
-  , SpecificSuccessResponseGetUnsatAssumptionsResponse <$> parseGetUnsatAssumptionsResponse
-  , SpecificSuccessResponseGetUnsatCoreResponse <$> parseGetUnsatCoreResponse
-  , SpecificSuccessResponseGetValueResponse <$> parseGetValueResponse
-  ]
+parseSpecificSuccessResponse :: Command -> Parser SpecificSuccessResponse
+parseSpecificSuccessResponse = \case
+  CheckSat ->
+    SpecificSuccessResponseCheckSatResponse <$> parseCheckSatResponse
+  CheckSatAssuming _ ->
+    SpecificSuccessResponseCheckSatResponse <$> parseCheckSatResponse
+  Echo _ ->
+    SpecificSuccessResponseEchoResponse <$> parseEchoResponse
+  GetAssertions ->
+    SpecificSuccessResponseGetAssertionsResponse <$> parseGetAssertionsResponse
+  GetAssignment ->
+    SpecificSuccessResponseGetAssignmentResponse <$> parseGetAssignmentResponse
+  GetInfo _ ->
+    SpecificSuccessResponseGetInfoResponse <$> parseGetInfoResponse
+  GetModel ->
+    SpecificSuccessResponseGetModelResponse <$> parseGetModelResponse
+  GetOption _ ->
+    SpecificSuccessResponseGetOptionResponse <$> parseGetOptionResponse
+  GetProof ->
+    SpecificSuccessResponseGetProofResponse <$> parseGetProofResponse
+  GetUnsatAssumptions ->
+    SpecificSuccessResponseGetUnsatAssumptionsResponse <$> parseGetUnsatAssumptionsResponse
+  GetUnsatCore ->
+    SpecificSuccessResponseGetUnsatCoreResponse <$> parseGetUnsatCoreResponse
+  GetValue _ ->
+    SpecificSuccessResponseGetValueResponse <$> parseGetValueResponse
+  _ -> fail "Command does not have a specific success response."
 
 -- | Unparse 'SpecificSuccessResponse'
 unparseSpecificSuccessResponse :: SpecificSuccessResponse -> Builder
@@ -3089,6 +3102,7 @@ unparseSpecificSuccessResponse = \case
   SpecificSuccessResponseGetValueResponse getValueResponse ->
     unparseGetValueResponse getValueResponse
 
+
 {- |
 @
 \<general_response\> ::= success
@@ -3109,10 +3123,10 @@ data GeneralResponse
   deriving (Show, Read, Eq)
 
 -- | Parse 'GeneralResponse'
-parseGeneralResponse :: Parser GeneralResponse
-parseGeneralResponse = choice
+parseGeneralResponse :: Command -> Parser GeneralResponse
+parseGeneralResponse command = choice
   [ GeneralResponseSuccess <$ string "success"
-  , GeneralResponseSpecificSuccessResponse <$> parseSpecificSuccessResponse
+  , GeneralResponseSpecificSuccessResponse <$> parseSpecificSuccessResponse command
   , GeneralResponseUnsupported <$ string "unsupported"
   , parseGeneralResponseError
   ] <* skipSpace
