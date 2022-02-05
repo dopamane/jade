@@ -21,6 +21,9 @@ module Subpar (
   -- * Syntax
   module Subpar.Syntax,
 
+  -- * Stock
+  printSuccess
+
 ) where
 
 import Control.Monad (forM)
@@ -32,6 +35,10 @@ import System.IO (hReady)
 
 import Subpar.Process
 import Subpar.Syntax
+
+--------------
+-- Transmit --
+--------------
 
 -- | Send 'Command's and receive 'GeneralResponse's.
 transmit :: SmtHandle -> [Command] -> IO [Result GeneralResponse]
@@ -55,7 +62,15 @@ send hndl cmd = hPutBuilder (smtIn hndl) $ unparseCommand cmd <> char8 '\n'
 -- See 'transmit' for high-level interface.
 recv :: SmtHandle -> IO ByteString
 recv hndl = do
-  isReady <- hReady $ smtOut hndl
-  if isReady
-    then C.hGetLine $ smtOut hndl
+  rdy <- hReady $ smtOut hndl
+  if rdy
+    then C.hGetLine (smtOut hndl)
     else return C.empty
+
+-----------
+-- Stock --
+-----------
+
+-- | @(set-option :print-success <b_value>)@
+printSuccess :: Bool -> Command
+printSuccess = SetOption . OptionPrintSuccess . BValue

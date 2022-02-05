@@ -347,10 +347,11 @@ import Data.Attoparsec.ByteString.Char8 (
   hexadecimal,
   isAlpha_iso8859_15,
   isDigit,
-  isSpace,
   many',
   many1',
+  option,
   parseOnly,
+  peekChar,
   satisfy,
   skipSpace,
   string,
@@ -466,11 +467,24 @@ newtype Numeral = Numeral{ unNumeral :: Integer }
 
 -- | Parse 'Numeral'
 parseNumeral :: Parser Numeral
-parseNumeral = Numeral `fmap` decimal <* skipSpace -- decimal might be loose
+parseNumeral = do
+  dec <- decimal
+  peekChar >>= \case
+    Just '.' -> fail "Numeral cannot contain '.'. Fail to Decimal"
+    _ -> Numeral dec <$ skipSpace
+    
 
 -- | Unparse 'Numeral'
 unparseNumeral :: Numeral -> Builder
 unparseNumeral = integerDec . unNumeral
+
+-- | 'parseNumeral' . 'unparseNumeral' == id
+prop_numeral_forward :: Property
+prop_numeral_forward = property $ do
+  n <- forAll $ Gen.integral $ Range.linear 0 (maxBound :: Int)
+  let num   = Numeral $ fromIntegral n
+      numBs = toStrict $ toLazyByteString $ unparseNumeral num
+  parseOnly parseNumeral numBs === Right num
 
 
 -- | @\<decimal\> ::= \<numeral\>.0*\<numeral\>@
@@ -596,6 +610,7 @@ parseSimpleSymbol :: Parser SimpleSymbol
 parseSimpleSymbol = do
   c  <- satisfy $ \c -> not (isDigit c) && isSimpleChar c
   cs <- takeWhile isSimpleChar
+  skipSpace
   return $ SimpleSymbol $ c `C.cons` cs
   where
     isSimpleChar c = isDigit c || isAlpha_iso8859_15 c || isSpecial c
@@ -691,7 +706,7 @@ data SpecConstant
 parseSpecConstant :: Parser SpecConstant
 parseSpecConstant = choice
   [ SpecConstantNumeral     <$> parseNumeral
-  , SpecConstantDecimal     <$> parseDecimal
+  , SpecConstantDecimal     <$> parseDecimal -- order matters
   , SpecConstantHexadecimal <$> parseHexadecimal
   , SpecConstantBinary      <$> parseBinary
   , SpecConstantString      <$> parseSString
@@ -875,10 +890,11 @@ data Attribute
 
 -- | Parse 'Attribute'
 parseAttribute :: Parser Attribute
-parseAttribute = choice -- order matters!
-  [ AttributeKeywordAttributeValue <$> parseKeyword <*> parseAttributeValue
-  , AttributeKeyword               <$> parseKeyword
-  ]
+parseAttribute = do
+  keyword <- parseKeyword
+  option
+    (AttributeKeyword keyword)
+    (AttributeKeywordAttributeValue keyword <$> parseAttributeValue)
 
 -- | Unparse 'Attribute'
 unparseAttribute :: Attribute -> Builder
@@ -2352,9 +2368,9 @@ parseCommand = choice
     parseSetOption = do
       par '('
       "set-option" *> skipSpace
-      option <- parseOption
+      opt <- parseOption
       par ')'
-      return $ SetOption option
+      return $ SetOption opt
 
 -- | Unparse 'Command'
 unparseCommand :: Command -> Builder
@@ -2527,11 +2543,11 @@ unparseCommand = \case
       , unparseSymbol symbol
       , char8 ')'
       ]
-  SetOption option ->
+  SetOption opt ->
     unwordsB
       [ char8 '('
       , byteString "set-option"
-      , unparseOption option
+      , unparseOption opt
       , char8 ')'
       ]
 

@@ -4,18 +4,24 @@ module Main where
 
 import Data.Attoparsec.Text (IResult(Done))
 import Data.ByteString.Builder (toLazyByteString)
+import Data.List.NonEmpty (NonEmpty((:|)))
 import Subpar (
   Attribute(..),
   AttributeValue(..),
   BValue(..),
   Command(..),
   Identifier(..),
+  InfoFlag(..),
   Keyword(..),
+  Numeral(..),
   Option(..),
+  QualIdentifier(..),
   SimpleSymbol(..),
   SmtHandle(..),
   Sort(..),
   Symbol(..),
+  Term(..),
+  printSuccess,
   transmit,
   transmit_,
   unparseCommand,
@@ -33,8 +39,7 @@ main = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
   hSetBinaryMode (smtOut smtHandle) True
   hSetBuffering  (smtIn  smtHandle) LineBuffering
   hSetBuffering  (smtOut smtHandle) LineBuffering
-  let printSuccess = SetOption $ OptionPrintSuccess $ BValue True
-      setSmtLibVer = SetInfo $
+  let setSmtLibVer = SetInfo $
                        AttributeKeywordAttributeValue
                          (Keyword $ SimpleSymbol "smt-lib-version")
                          (AttributeValueSymbol $ 
@@ -50,19 +55,63 @@ main = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
                                  []
                                )
       
-      assertXGtY = undefined
+      assertGt a b = Assert $ 
+                       TermQualIdentifiers
+                         (QualIdentifier $
+                           IdentifierSymbol $
+                             SymbolSimpleSymbol $
+                               SimpleSymbol ">"
+                         )
+                         (
+                           (TermQualIdentifier $
+                              QualIdentifier $
+                                IdentifierSymbol $
+                                  SymbolSimpleSymbol $
+                                    SimpleSymbol a
+                           )
+                           :|
+                             [TermQualIdentifier $
+                               QualIdentifier $
+                                 IdentifierSymbol $
+                                   SymbolSimpleSymbol $
+                                     SimpleSymbol b
+                             ]
+                         )
+      push1 = Push $ Numeral 1
+      pop1 = Pop $ Numeral 1
+      getInfoAllStatistics = GetInfo InfoFlagAllStatistics
+                            
   transmit 
     smtHandle 
-    [ printSuccess
+    [ printSuccess True
     , setSmtLibVer
     , setLogicQFLIA
     , declareConst "w" "Int"
     , declareConst "x" "Int"
     , declareConst "y" "Int"
     , declareConst "z" "Int"
+    , assertGt "x" "y"
+    , assertGt "y" "z"
     ] >>= mapM_ printResult
+  transmit_ 
+    smtHandle 
+    [ printSuccess False
+    , push1
+    , assertGt "z" "x"
+    ]
+  transmit
+    smtHandle
+    [ CheckSat
+    , getInfoAllStatistics
+    ] >>= mapM_ printResult
+  transmit_
+    smtHandle
+    [ pop1
+    , push1
+    ]
+  transmit smtHandle [CheckSat] >>= mapM_ printResult
   transmit_ smtHandle [Exit]
-  -- print $ toLazyByteString $ unparseCommand declareConstWInt
+  -- print $ toLazyByteString $ unparseCommand assertXGtY
   where
     printResult = \case
       Done _ r -> print r
