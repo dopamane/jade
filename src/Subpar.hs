@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 {-|
 Module      : Subpar
 Description : SMT interface
@@ -10,26 +11,18 @@ module Subpar (
   -- * Process
   module Subpar.Process,
 
-  -- * Transmit
-  transmit,
-  transmit_,
-
-  -- ** Low-level interface
+  -- * Transfer
+  xfer,
   send,
   recv,
 
   -- * Syntax
-  module Subpar.Syntax,
-
-  -- * Stock
-  printSuccess
+  module Subpar.Syntax
 
 ) where
 
-import Control.Monad (forM)
 import Data.Attoparsec.ByteString.Char8 (Result, parseWith)
 import Data.ByteString.Builder (hPutBuilder, char8)
-import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as C
 import System.IO (hReady)
 
@@ -37,44 +30,27 @@ import Subpar.Process
 import Subpar.Syntax
 
 --------------
--- Transmit --
+-- Transfer --
 --------------
 
--- | Send 'Command's and receive 'GeneralResponse's.
-transmit ::
-  Traversable t =>
-  SmtHandle ->
-  t Command ->
-  IO (t (Result GeneralResponse))
-transmit hndl cmds = forM cmds $ \cmd -> do
-  send hndl cmd
-  parseWith (recv hndl) (parseGeneralResponse cmd) =<< C.hGetLine (smtOut hndl)
+-- | Send a 'Command' and receive a 'GeneralResponse'.
+xfer :: SmtHandle -> Command -> IO (Result GeneralResponse)
+xfer hndl cmd = send hndl cmd >> recv hndl cmd
 
--- | Send 'Command's without receiving 'GeneralResponse's.
-transmit_ :: Traversable t => SmtHandle -> t Command -> IO ()
-transmit_ hndl = mapM_ (send hndl)
-
--- | Send 'Command' to 'SmtHandle'. See 'transmit' and 'transmit_'.
+-- | Send a 'Command'.
 send :: SmtHandle -> Command -> IO ()
-send hndl cmd = hPutBuilder (smtIn hndl) $ unparseCommand cmd <> char8 '\n'
+send (smtIn -> hndl) cmd = hPutBuilder hndl $ unparseCommand cmd <> char8 '\n'
 
--- | Receive line of 'ByteString' from 'SmtHandle'. 'recv' first checks
--- if there is at least one item available for input from the handle using
--- 'hReady'. If there is nothing available, 'recv' returns 'C.empty'. Otherwise
--- it uses 'C.hGetLine'.
+-- | Receive 'GeneralResponse'. 'Command' is needed to unambiguously parse a
+-- 'SpecificSuccessResponse'.
 -- See [StackOverflow thread](https://stackoverflow.com/q/33225837/4051020).
--- See 'transmit' for high-level interface.
-recv :: SmtHandle -> IO ByteString
-recv hndl = do
-  rdy <- hReady $ smtOut hndl
-  if rdy
-    then C.hGetLine (smtOut hndl)
-    else return C.empty
-
------------
--- Stock --
------------
-
--- | @(set-option :print-success <b_value>)@
-printSuccess :: Bool -> Command
-printSuccess = SetOption . OptionPrintSuccess . BValue
+-- See 'xfer'.
+recv :: SmtHandle -> Command -> IO (Result GeneralResponse)
+recv (smtOut -> hndl) cmd =
+  parseWith refill (parseGeneralResponse cmd) =<< C.hGetLine hndl
+  where
+    refill = do
+      rdy <- hReady hndl
+      if rdy
+        then C.hGetLine hndl
+        else return C.empty

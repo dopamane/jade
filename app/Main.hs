@@ -6,26 +6,23 @@ import Data.Attoparsec.Text (IResult(Done))
 import Data.ByteString.Builder (toLazyByteString)
 import Data.List.NonEmpty (NonEmpty((:|)))
 import Subpar (
-  Attribute(..),
   AttributeValue(..),
-  BValue(..),
   Command(..),
   Identifier(..),
   InfoFlag(..),
-  Keyword(..),
-  Numeral(..),
-  Option(..),
   QualIdentifier(..),
-  SimpleSymbol(..),
   SmtHandle(..),
   Sort(..),
-  Symbol(..),
   Term(..),
-  printSuccess,
-  transmit,
-  transmit_,
+  pop,
+  push,
+  send,
+  setInfo,
+  setOptionPrintSuccess,
+  symbolSimpleSymbol,
   unparseCommand,
   withSmtProcess,
+  xfer,
   )
 import System.IO (
   hSetBinaryMode,
@@ -39,18 +36,18 @@ main = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
   hSetBinaryMode (smtOut smtHandle) True
   hSetBuffering  (smtIn  smtHandle) LineBuffering
   hSetBuffering  (smtOut smtHandle) LineBuffering
-  let setSmtLibVer = SetInfo $
-                       AttributeKeywordAttributeValue
-                         (Keyword $ SimpleSymbol "smt-lib-version")
-                         (AttributeValueSymbol $ 
-                           SymbolSimpleSymbol $ SimpleSymbol "2.6"
-                         )
-      setLogicQFLIA = SetLogic $ SymbolSimpleSymbol $ SimpleSymbol "QF_LIA"
+  let setSmtLibVer = setInfo
+                       "smt-lib-version"
+                       (Just $
+                         AttributeValueSymbol $
+                           symbolSimpleSymbol "2.6"
+                       )
+      setLogicQFLIA = SetLogic $ symbolSimpleSymbol "QF_LIA"
       declareConst sym srt = DeclareConst
-                               (SymbolSimpleSymbol $ SimpleSymbol sym)
+                               (symbolSimpleSymbol sym)
                                (Sort 
                                  (IdentifierSymbol $ 
-                                   SymbolSimpleSymbol $ SimpleSymbol srt
+                                   symbolSimpleSymbol srt
                                  )
                                  []
                                )
@@ -59,31 +56,25 @@ main = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
                        TermQualIdentifiers
                          (QualIdentifier $
                            IdentifierSymbol $
-                             SymbolSimpleSymbol $
-                               SimpleSymbol ">"
+                             symbolSimpleSymbol ">"
                          )
                          (
                            (TermQualIdentifier $
                               QualIdentifier $
                                 IdentifierSymbol $
-                                  SymbolSimpleSymbol $
-                                    SimpleSymbol a
+                                  symbolSimpleSymbol a
                            )
                            :|
                              [TermQualIdentifier $
                                QualIdentifier $
                                  IdentifierSymbol $
-                                   SymbolSimpleSymbol $
-                                     SimpleSymbol b
+                                   symbolSimpleSymbol b
                              ]
                          )
-      push1 = Push $ Numeral 1
-      pop1 = Pop $ Numeral 1
       getInfoAllStatistics = GetInfo InfoFlagAllStatistics
                             
-  transmit 
-    smtHandle 
-    [ printSuccess True
+  mapM (xfer smtHandle)
+    [ setOptionPrintSuccess True
     , setSmtLibVer
     , setLogicQFLIA
     , declareConst "w" "Int"
@@ -93,24 +84,21 @@ main = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
     , assertGt "x" "y"
     , assertGt "y" "z"
     ] >>= mapM_ printResult
-  transmit_ 
-    smtHandle 
-    [ printSuccess False
-    , push1
+  mapM_ (send smtHandle)
+    [ setOptionPrintSuccess False
+    , push 1
     , assertGt "z" "x"
     ]
-  transmit
-    smtHandle
+  mapM (xfer smtHandle)
     [ CheckSat
     , getInfoAllStatistics
     ] >>= mapM_ printResult
-  transmit_
-    smtHandle
-    [ pop1
-    , push1
+  mapM_ (send smtHandle)
+    [ pop 1
+    , push 1
     ]
-  transmit smtHandle [CheckSat] >>= mapM_ printResult
-  transmit_ smtHandle [Exit]
+  xfer smtHandle CheckSat >>= printResult
+  send smtHandle Exit
   -- print $ toLazyByteString $ unparseCommand assertXGtY
   where
     printResult = \case

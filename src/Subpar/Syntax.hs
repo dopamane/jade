@@ -48,11 +48,13 @@ module Subpar.Syntax (
 
     -- *** Symbol
     Symbol (..),
+    symbolSimpleSymbol,
     parseSymbol,
     unparseSymbol,
 
     -- *** Keyword
     Keyword (..),
+    keyword,
     parseKeyword,
     unparseKeyword,
 
@@ -60,11 +62,18 @@ module Subpar.Syntax (
 
     -- *** SpecConstant
     SpecConstant (..),
+    specConstantNumeral,
+    specConstantDecimal,
+    specConstantHexadecimal,
+    specConstantBinary,
+    specConstantString,
     parseSpecConstant,
     unparseSpecConstant,
 
     -- *** SExpr
     SExpr (..),
+    sExprReserved,
+    sExprKeyword,
     parseSExpr,
     unparseSExpr,
 
@@ -72,6 +81,7 @@ module Subpar.Syntax (
 
     -- *** Index
     Index (..),
+    indexNumeral,
     parseIndex,
     unparseIndex,
 
@@ -94,6 +104,7 @@ module Subpar.Syntax (
 
     -- *** Attribute
     Attribute (..),
+    attribute,
     parseAttribute,
     unparseAttribute,
 
@@ -133,6 +144,7 @@ module Subpar.Syntax (
 
     -- *** SortSymbolDecl
     SortSymbolDecl (..),
+    sortSymbolDecl,
     parseSortSymbolDecl,
     unparseSortSymbolDecl,
 
@@ -175,6 +187,7 @@ module Subpar.Syntax (
 
     -- ** Info flags
     InfoFlag (..),
+    infoFlagKeyword,
     parseInfoFlag,
     unparseInfoFlag,
 
@@ -187,6 +200,21 @@ module Subpar.Syntax (
 
     -- *** Option
     Option (..),
+    optionDiagnosticOutputChannel,
+    optionGlobalDeclarations,
+    optionInteractiveMode,
+    optionPrintSuccess,
+    optionProduceAssertions,
+    optionProduceAssignments,
+    optionProduceModels,
+    optionProduceProofs,
+    optionProduceUnsatAssumptions,
+    optionProduceUnsatCores,
+    optionRandomSeed,
+    optionRegularOutputChannel,
+    optionReproducibleResourceLimit,
+    optionVerbosity,
+    optionAttribute,
     parseOption,
     unparseOption,
 
@@ -229,6 +257,29 @@ module Subpar.Syntax (
 
     -- *** Command
     Command (..),
+    declareSort,
+    defineFun,
+    defineFunRec,
+    echo,
+    getOption,
+    pop,
+    push,
+    setInfo,
+    setOptionDiagnosticOutputChannel,
+    setOptionGlobalDeclarations,
+    setOptionInteractiveMode,
+    setOptionPrintSuccess,
+    setOptionProduceAssertions,
+    setOptionProduceAssignments,
+    setOptionProduceModels,
+    setOptionProduceProofs,
+    setOptionProduceUnsatAssumptions,
+    setOptionProduceUnsatCores,
+    setOptionRandomSeed,
+    setOptionRegularOutputChannel,
+    setOptionReproducibleResourceLimit,
+    setOptionVerbosity,
+    setOptionAttribute,
     parseCommand,
     unparseCommand,
 
@@ -647,6 +698,10 @@ data Symbol = SymbolSimpleSymbol SimpleSymbol
             | SymbolQuoted ByteString
   deriving (Show, Read, Eq)
 
+-- | Construct 'SymbolSimpleSymbol'
+symbolSimpleSymbol :: ByteString -> Symbol
+symbolSimpleSymbol = SymbolSimpleSymbol . SimpleSymbol
+
 -- | Parse 'Symbol'
 parseSymbol :: Parser Symbol
 parseSymbol = choice
@@ -665,6 +720,10 @@ unparseSymbol = \case
 -- | @\<keyword\> ::= :\<simple_symbol\>@
 newtype Keyword = Keyword{ unKeyword :: SimpleSymbol }
   deriving (Show, Read, Eq)
+
+-- | Construct 'Keyword'
+keyword :: ByteString -> Keyword
+keyword = Keyword . SimpleSymbol
 
 -- | Parse 'Keyword'
 parseKeyword :: Parser Keyword
@@ -702,6 +761,26 @@ data SpecConstant
     SpecConstantString SString
   deriving (Show, Read, Eq)
 
+-- | Construct 'SpecConstantNumeral'
+specConstantNumeral :: Integer -> SpecConstant
+specConstantNumeral = SpecConstantNumeral . Numeral
+
+-- | Construct 'SpecConstantDecimal'
+specConstantDecimal :: Double -> SpecConstant
+specConstantDecimal = SpecConstantDecimal . Decimal
+
+-- | Construct 'SpecConstantHexadecimal'
+specConstantHexadecimal :: Integer -> SpecConstant
+specConstantHexadecimal = SpecConstantHexadecimal . Hexadecimal
+
+-- | Construct 'SpecConstantBinary'
+specConstantBinary :: Integer -> SpecConstant
+specConstantBinary = SpecConstantBinary . Binary
+
+-- | Construct 'SpecConstantString'
+specConstantString :: ByteString -> SpecConstant
+specConstantString = SpecConstantString . SString
+
 -- | Parse 'SpecConstant'
 parseSpecConstant :: Parser SpecConstant
 parseSpecConstant = choice
@@ -738,6 +817,15 @@ data SExpr = SExprSpecConstant SpecConstant -- ^ \<spec_constant\>
            | SExprs [SExpr]                 -- ^ ( \<s_expr\>* )
   deriving (Show, Read, Eq)
 
+-- | Construct 'SExprReserved'. Warning: this function does not check that
+-- 'ByteString' is a reserved word.
+sExprReserved :: ByteString -> SExpr
+sExprReserved = SExprReserved . Reserved
+
+-- | Construct 'SExprKeyword'.
+sExprKeyword :: ByteString -> SExpr
+sExprKeyword = SExprKeyword . keyword
+
 -- | Parse 'SExpr'
 parseSExpr :: Parser SExpr
 parseSExpr = choice
@@ -754,7 +842,7 @@ unparseSExpr = \case
   SExprSpecConstant specConstant -> unparseSpecConstant specConstant
   SExprSymbol       symbol       -> unparseSymbol symbol
   SExprReserved     rsvd         -> unparseReserved rsvd
-  SExprKeyword      keyword      -> unparseKeyword keyword
+  SExprKeyword      kywd         -> unparseKeyword kywd
   SExprs            exprs        -> 
     unwordsB [char8 '(', unwordsB $ unparseSExpr <$> exprs, char8 ')']
 
@@ -767,6 +855,10 @@ unparseSExpr = \case
 data Index = IndexNumeral Numeral -- ^ \<numeral\>
            | IndexSymbol  Symbol  -- ^ \<symbol\>
   deriving (Show, Read, Eq)
+
+-- | Construct 'IndexNumeral'
+indexNumeral :: Integer -> Index
+indexNumeral = IndexNumeral . Numeral
 
 -- | Parse 'Index'
 parseIndex :: Parser Index
@@ -881,27 +973,34 @@ unparseAttributeValue = \case
 
 
 -- | @\<attribute\> ::= \<keyword\> | \<keyword\> \<attribute_value\>@
-data Attribute
-  = -- | \<keyword\>
-    AttributeKeyword Keyword
-  | -- | \<keyword\> \<attribute_value\>
-    AttributeKeywordAttributeValue Keyword AttributeValue
+data Attribute = Attribute
+  { attributeKeyword        :: Keyword
+  , attributeAttributeValue :: Maybe AttributeValue
+  }
   deriving (Show, Read, Eq)
+
+-- | Construct 'Attribute'
+attribute ::
+  -- | 'Keyword'
+  ByteString ->
+  Maybe AttributeValue ->
+  Attribute
+attribute kywd = Attribute (keyword kywd)
 
 -- | Parse 'Attribute'
 parseAttribute :: Parser Attribute
 parseAttribute = do
-  keyword <- parseKeyword
+  kywd <- parseKeyword
   option
-    (AttributeKeyword keyword)
-    (AttributeKeywordAttributeValue keyword <$> parseAttributeValue)
+    (Attribute kywd Nothing)
+    (Attribute kywd . Just <$> parseAttributeValue)
 
 -- | Unparse 'Attribute'
 unparseAttribute :: Attribute -> Builder
-unparseAttribute = \case
-  AttributeKeyword keyword -> unparseKeyword keyword
-  AttributeKeywordAttributeValue keyword attributeValue ->
-    unwordsB [unparseKeyword keyword, unparseAttributeValue attributeValue]
+unparseAttribute (Attribute kywd attributeValueM) = case attributeValueM of
+  Nothing -> unparseKeyword kywd
+  Just attributeValue ->
+    unwordsB [unparseKeyword kywd, unparseAttributeValue attributeValue]
 
 
 -----------
@@ -1219,6 +1318,18 @@ data SortSymbolDecl = SortSymbolDecl
   }
   deriving (Show, Read, Eq)
 
+-- | Construct 'SortSymbolDecl'
+sortSymbolDecl ::
+  Identifier ->
+  Integer ->
+  [Attribute] ->
+  SortSymbolDecl
+sortSymbolDecl ident num attrs = SortSymbolDecl
+  { sortSymbolDeclIdentifier = ident
+  , sortSymbolDeclNumeral    = Numeral num
+  , sortSymbolDeclAttributes = attrs
+  }
+
 -- | Parse 'SortSymbolDecl'
 parseSortSymbolDecl :: Parser SortSymbolDecl
 parseSortSymbolDecl = do
@@ -1234,12 +1345,12 @@ parseSortSymbolDecl = do
 
 -- | Unparse 'SortSymbolDecl'
 unparseSortSymbolDecl :: SortSymbolDecl -> Builder
-unparseSortSymbolDecl sortSymbolDecl =
+unparseSortSymbolDecl srtSymDecl =
   unwordsB 
     [ char8 '('
-    ,            unparseIdentifier $  sortSymbolDeclIdentifier sortSymbolDecl
-    ,            unparseNumeral    $  sortSymbolDeclNumeral    sortSymbolDecl
-    , unwordsB $ unparseAttribute <$> sortSymbolDeclAttributes sortSymbolDecl
+    ,            unparseIdentifier $  sortSymbolDeclIdentifier srtSymDecl
+    ,            unparseNumeral    $  sortSymbolDeclNumeral    srtSymDecl
+    , unwordsB $ unparseAttribute <$> sortSymbolDeclAttributes srtSymDecl
     , char8 ')'
     ]
 
@@ -1492,7 +1603,7 @@ unparseTheoryAttribute = \case
     unwordsB [byteString ":values", unparseSString str]
   TheoryAttributeNotes str ->
     unwordsB [byteString ":notes", unparseSString str]
-  TheoryAttributeAttribute attribute -> unparseAttribute attribute
+  TheoryAttributeAttribute attr -> unparseAttribute attr
 
 
 -- | @\<theory_decl\> ::= ( theory \<symbol\> \<theory_attribute\>+ )@
@@ -1595,7 +1706,7 @@ unparseLogicAttribute = \case
     unwordsB [byteString ":values", unparseSString str]
   LogicAttributeNotes      str ->
     unwordsB [byteString ":notes", unparseSString str]
-  LogicAttributeAttribute attribute -> unparseAttribute attribute
+  LogicAttributeAttribute attr -> unparseAttribute attr
 
 
 -- | @\<logic\> ::= ( logic \<symbol\> \<logic_attribute\>+ )@
@@ -1652,6 +1763,10 @@ data InfoFlag = InfoFlagAllStatistics        -- ^ :all-statistics
               | InfoFlagKeyword Keyword      -- ^ \<keyword\>
   deriving (Show, Read, Eq)
 
+-- | Construct 'InfoFlagKeyword'
+infoFlagKeyword :: ByteString -> InfoFlag
+infoFlagKeyword = InfoFlagKeyword . keyword
+
 -- | Parse 'InfoFlag'
 parseInfoFlag :: Parser InfoFlag
 parseInfoFlag = choice
@@ -1675,7 +1790,7 @@ unparseInfoFlag = \case
   InfoFlagName                 -> byteString ":name"
   InfoFlagReasonUnknown        -> byteString ":reason-unknown"
   InfoFlagVersion              -> byteString ":version"
-  InfoFlagKeyword keyword      -> unparseKeyword keyword
+  InfoFlagKeyword kywd         -> unparseKeyword kywd
 
 ---------------------
 -- Command options --
@@ -1701,7 +1816,7 @@ unparseBValue (BValue False) = byteString "false"
 {- |
 @
 \<option\> ::= :diagnostic-output-channel \<string\>
-           | :global-declaration \<b_value\>
+           | :global-declarations \<b_value\>
            | :interactive-mode \<b_value\>
            | :print-success \<b_value\>
            | :produce-assertions \<b_value\>
@@ -1763,6 +1878,66 @@ data Option
   | -- | \<attribute\>
     OptionAttribute Attribute
   deriving (Show, Read, Eq)
+
+-- | Construct 'OptionDiagnosticOutputChannel'
+optionDiagnosticOutputChannel :: ByteString -> Option
+optionDiagnosticOutputChannel = OptionDiagnosticOutputChannel . SString
+
+-- | Construct 'OptionGlobalDeclarations'
+optionGlobalDeclarations :: Bool -> Option
+optionGlobalDeclarations = OptionGlobalDeclarations . BValue
+
+-- | Construct 'OptionInteractiveMode'
+optionInteractiveMode :: Bool -> Option
+optionInteractiveMode = OptionInteractiveMode . BValue
+
+-- | Construct 'OptionPrintSuccess'
+optionPrintSuccess :: Bool -> Option
+optionPrintSuccess = OptionPrintSuccess . BValue
+
+-- | Construct 'OptionProduceAssertions'
+optionProduceAssertions :: Bool -> Option
+optionProduceAssertions = OptionProduceAssertions . BValue
+
+-- | Construct 'OptionProduceAssignments'
+optionProduceAssignments :: Bool -> Option
+optionProduceAssignments = OptionProduceAssignments . BValue
+
+-- | Construct 'OptionProduceModels'
+optionProduceModels :: Bool -> Option
+optionProduceModels = OptionProduceModels . BValue
+
+-- | Construct 'OptionProduceProofs'
+optionProduceProofs :: Bool -> Option
+optionProduceProofs = OptionProduceProofs . BValue
+
+-- | Construct 'OptionProduceUnsatAssumptions'
+optionProduceUnsatAssumptions :: Bool -> Option
+optionProduceUnsatAssumptions = OptionProduceUnsatAssumptions . BValue
+
+-- | Construct 'OptionProduceUnsatCores'
+optionProduceUnsatCores :: Bool -> Option
+optionProduceUnsatCores = OptionProduceUnsatCores . BValue
+
+-- | Construct 'OptionRandomSeed'
+optionRandomSeed :: Integer -> Option
+optionRandomSeed = OptionRandomSeed . Numeral
+
+-- | Construct 'OptionRegularOutputChannel'
+optionRegularOutputChannel :: ByteString -> Option
+optionRegularOutputChannel = OptionRegularOutputChannel . SString
+
+-- | Construct 'OptionReproducibleResourceLimit'
+optionReproducibleResourceLimit :: Integer -> Option
+optionReproducibleResourceLimit = OptionReproducibleResourceLimit . Numeral
+
+-- | Construct 'OptionVerbosity'
+optionVerbosity :: Integer -> Option
+optionVerbosity = OptionVerbosity . Numeral
+
+-- | Construct 'OptionAttribute'
+optionAttribute :: ByteString -> Maybe (AttributeValue) -> Option
+optionAttribute kywd = OptionAttribute . attribute kywd
 
 -- | Parse 'Option'
 parseOption :: Parser Option
@@ -1829,7 +2004,7 @@ unparseOption = \case
     unwordsB [byteString ":reproducible-resource-limit", unparseNumeral n   ]
   OptionVerbosity                 n   ->
     unwordsB [byteString ":verbosity"                  , unparseNumeral n   ]
-  OptionAttribute attribute -> unparseAttribute attribute
+  OptionAttribute attr -> unparseAttribute attr
 
 --------------
 -- Commands --
@@ -2165,6 +2340,99 @@ data Command
     SetOption Option
   deriving (Show, Read, Eq)
 
+-- | Construct 'DeclareSort'
+declareSort :: Symbol -> Integer -> Command
+declareSort sym = DeclareSort sym . Numeral
+
+-- | Construct 'DefineFun'
+defineFun :: Symbol -> [SortedVar] -> Sort -> Term -> Command
+defineFun sym sVars srt = DefineFun . FunctionDef sym sVars srt
+
+-- | Construct 'DefineFunRec'
+defineFunRec :: Symbol -> [SortedVar] -> Sort -> Term -> Command
+defineFunRec sym sVars srt = DefineFunRec . FunctionDef sym sVars srt
+
+-- | Construct 'Echo'
+echo :: ByteString -> Command
+echo = Echo . SString
+
+-- | Construct 'GetOption'
+getOption :: ByteString -> Command
+getOption = GetOption . keyword
+
+-- | Construct 'Pop'
+pop :: Integer -> Command
+pop = Pop . Numeral
+
+-- | Construct 'Push'
+push :: Integer -> Command
+push = Push . Numeral
+
+-- | Construct 'SetInfo'
+setInfo :: ByteString -> Maybe (AttributeValue) -> Command
+setInfo kywd = SetInfo . attribute kywd
+
+-- | @( set-option :diagnostic-output-channel \<string\> )
+setOptionDiagnosticOutputChannel :: ByteString -> Command
+setOptionDiagnosticOutputChannel = SetOption . optionDiagnosticOutputChannel
+
+-- | @( set-option :global-declarations \<b_value\> )
+setOptionGlobalDeclarations :: Bool -> Command
+setOptionGlobalDeclarations = SetOption . optionGlobalDeclarations
+
+-- | @( set-option :interactive-mode \<b_value\> )
+setOptionInteractiveMode :: Bool -> Command
+setOptionInteractiveMode = SetOption . optionInteractiveMode
+
+-- | @( set-option :print-success \<b_value\> )@
+setOptionPrintSuccess :: Bool -> Command
+setOptionPrintSuccess = SetOption . optionPrintSuccess
+
+-- | @( set-option :produce-assertions \<b_value\> )
+setOptionProduceAssertions :: Bool -> Command
+setOptionProduceAssertions = SetOption . optionProduceAssertions
+
+-- | @( set-option :produce-assignments \<b_value\> )
+setOptionProduceAssignments :: Bool -> Command
+setOptionProduceAssignments = SetOption . optionProduceAssignments
+
+-- | @( set-option :produce-models \<b_value\> )
+setOptionProduceModels :: Bool -> Command
+setOptionProduceModels = SetOption . optionProduceModels
+
+-- | @( set-option :produce-proofs \<b_value\> )
+setOptionProduceProofs :: Bool -> Command
+setOptionProduceProofs = SetOption . optionProduceProofs
+
+-- | @( set-option :produce-unsat-assumptions \<b_value\> )
+setOptionProduceUnsatAssumptions :: Bool -> Command
+setOptionProduceUnsatAssumptions = SetOption . optionProduceUnsatAssumptions
+
+-- | @( set-option :produce-unsat-cores \<b_value\> )
+setOptionProduceUnsatCores :: Bool -> Command
+setOptionProduceUnsatCores = SetOption . optionProduceUnsatCores
+
+-- | @( set-option :random-seed \<numeral\> )
+setOptionRandomSeed :: Integer -> Command
+setOptionRandomSeed = SetOption . optionRandomSeed
+
+-- | @( set-option :regular-output-channel \<string\> )
+setOptionRegularOutputChannel :: ByteString -> Command
+setOptionRegularOutputChannel = SetOption . optionRegularOutputChannel
+
+-- | @( set-option :reproducible-resource-limit \<numeral\> )
+setOptionReproducibleResourceLimit :: Integer -> Command
+setOptionReproducibleResourceLimit =
+  SetOption . optionReproducibleResourceLimit
+
+-- | @( set-option :verbosity \<numeral\> )
+setOptionVerbosity :: Integer -> Command
+setOptionVerbosity = SetOption . optionVerbosity
+
+-- | @( set-option \<attribute\> )
+setOptionAttribute :: ByteString -> Maybe (AttributeValue) -> Command
+setOptionAttribute kywd = SetOption . optionAttribute kywd
+
 -- | Parse 'Command'
 parseCommand :: Parser Command
 parseCommand = choice
@@ -2312,9 +2580,9 @@ parseCommand = choice
     parseGetOption = do
       par '('
       "get-option" *> skipSpace
-      keyword <- parseKeyword
+      kywd <- parseKeyword
       par ')'
-      return $ GetOption keyword
+      return $ GetOption kywd
     parseGetProof =
       par '(' *> "get-proof" *> skipSpace <* par ')' $> GetProof
     parseGetUnsatAssumptions = do
@@ -2356,9 +2624,9 @@ parseCommand = choice
     parseSetInfo = do
       par '('
       "set-info" *> skipSpace
-      attribute <- parseAttribute
+      attr <- parseAttribute
       par ')'
-      return $ SetInfo attribute
+      return $ SetInfo attr
     parseSetLogic = do
       par '('
       "set-logic" *> skipSpace
@@ -2494,11 +2762,11 @@ unparseCommand = \case
       , char8 ')'
       ]
   GetModel -> byteString "( get-model )"
-  GetOption keyword ->
+  GetOption kywd ->
     unwordsB
       [ char8 '('
       , byteString "get-option"
-      , unparseKeyword keyword
+      , unparseKeyword kywd
       , char8 ')'
       ]
   GetProof -> byteString "( get-proof )"
@@ -2529,11 +2797,11 @@ unparseCommand = \case
       ]
   Reset -> byteString "( reset )"
   ResetAssertions -> byteString "( reset-assertions )"
-  SetInfo attribute ->
+  SetInfo attr ->
     unwordsB
       [ char8 '('
       , byteString "set-info"
-      , unparseAttribute attribute
+      , unparseAttribute attr
       , char8 ')'
       ]
   SetLogic symbol ->
@@ -2754,8 +3022,8 @@ unparseInfoResponse = \case
     unwordsB [byteString ":reason-unknown", unparseReasonUnknown reasonUnknown]
   InfoResponseVersion str -> 
     unwordsB [byteString ":version", unparseSString str]
-  InfoResponseAttribute attribute ->
-    unparseAttribute attribute
+  InfoResponseAttribute attr ->
+    unparseAttribute attr
 
 
 -- | @\<valuation_pair\> ::= ( \<term\> \<term\> )@

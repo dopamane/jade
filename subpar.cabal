@@ -53,7 +53,8 @@ library
   ghc-options: -Wall
   other-extensions: OverloadedStrings,
                     StrictData,
-                    TemplateHaskell
+                    TemplateHaskell,
+                    ViewPatterns
   default-extensions: LambdaCase
 
   default-language: Haskell2010
