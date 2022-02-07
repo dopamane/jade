@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
+import Criterion.Main
 import Data.Attoparsec.Text (IResult(Done))
 import Data.ByteString.Builder (toLazyByteString)
 import qualified Data.ByteString.Lazy.Char8 as C
@@ -33,8 +34,7 @@ import System.IO (
   )
 
 main :: IO ()
-main = do
-  putStrLn "Subpar!"
+main = defaultMain [bench "Ex 3.10" $ nfIO ex310]
 
 {-
 ex311 :: IO ()
