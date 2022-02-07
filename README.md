@@ -1,6 +1,16 @@
 # subpar :golf:
 Haskell SMT Interface. Under construction. :construction:
 
+## Build
+```bash
+git clone https://github.com/dopamane/subpar
+
+# SMT-LIB-benchmarks submodule; necessary for testing and benchmarking
+git submodule update --init --recursive
+
+cabal build
+```
+
 ## Usage
 
 ### Obtain handle to SMT process:
