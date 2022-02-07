@@ -2372,15 +2372,15 @@ push = Push . Numeral
 setInfo :: ByteString -> Maybe (AttributeValue) -> Command
 setInfo kywd = SetInfo . attribute kywd
 
--- | @( set-option :diagnostic-output-channel \<string\> )
+-- | @( set-option :diagnostic-output-channel \<string\> )@
 setOptionDiagnosticOutputChannel :: ByteString -> Command
 setOptionDiagnosticOutputChannel = SetOption . optionDiagnosticOutputChannel
 
--- | @( set-option :global-declarations \<b_value\> )
+-- | @( set-option :global-declarations \<b_value\> )@
 setOptionGlobalDeclarations :: Bool -> Command
 setOptionGlobalDeclarations = SetOption . optionGlobalDeclarations
 
--- | @( set-option :interactive-mode \<b_value\> )
+-- | @( set-option :interactive-mode \<b_value\> )@
 setOptionInteractiveMode :: Bool -> Command
 setOptionInteractiveMode = SetOption . optionInteractiveMode
 
@@ -2388,48 +2388,48 @@ setOptionInteractiveMode = SetOption . optionInteractiveMode
 setOptionPrintSuccess :: Bool -> Command
 setOptionPrintSuccess = SetOption . optionPrintSuccess
 
--- | @( set-option :produce-assertions \<b_value\> )
+-- | @( set-option :produce-assertions \<b_value\> )@
 setOptionProduceAssertions :: Bool -> Command
 setOptionProduceAssertions = SetOption . optionProduceAssertions
 
--- | @( set-option :produce-assignments \<b_value\> )
+-- | @( set-option :produce-assignments \<b_value\> )@
 setOptionProduceAssignments :: Bool -> Command
 setOptionProduceAssignments = SetOption . optionProduceAssignments
 
--- | @( set-option :produce-models \<b_value\> )
+-- | @( set-option :produce-models \<b_value\> )@
 setOptionProduceModels :: Bool -> Command
 setOptionProduceModels = SetOption . optionProduceModels
 
--- | @( set-option :produce-proofs \<b_value\> )
+-- | @( set-option :produce-proofs \<b_value\> )@
 setOptionProduceProofs :: Bool -> Command
 setOptionProduceProofs = SetOption . optionProduceProofs
 
--- | @( set-option :produce-unsat-assumptions \<b_value\> )
+-- | @( set-option :produce-unsat-assumptions \<b_value\> )@
 setOptionProduceUnsatAssumptions :: Bool -> Command
 setOptionProduceUnsatAssumptions = SetOption . optionProduceUnsatAssumptions
 
--- | @( set-option :produce-unsat-cores \<b_value\> )
+-- | @( set-option :produce-unsat-cores \<b_value\> )@
 setOptionProduceUnsatCores :: Bool -> Command
 setOptionProduceUnsatCores = SetOption . optionProduceUnsatCores
 
--- | @( set-option :random-seed \<numeral\> )
+-- | @( set-option :random-seed \<numeral\> )@
 setOptionRandomSeed :: Integer -> Command
 setOptionRandomSeed = SetOption . optionRandomSeed
 
--- | @( set-option :regular-output-channel \<string\> )
+-- | @( set-option :regular-output-channel \<string\> )@
 setOptionRegularOutputChannel :: ByteString -> Command
 setOptionRegularOutputChannel = SetOption . optionRegularOutputChannel
 
--- | @( set-option :reproducible-resource-limit \<numeral\> )
+-- | @( set-option :reproducible-resource-limit \<numeral\> )@
 setOptionReproducibleResourceLimit :: Integer -> Command
 setOptionReproducibleResourceLimit =
   SetOption . optionReproducibleResourceLimit
 
--- | @( set-option :verbosity \<numeral\> )
+-- | @( set-option :verbosity \<numeral\> )@
 setOptionVerbosity :: Integer -> Command
 setOptionVerbosity = SetOption . optionVerbosity
 
--- | @( set-option \<attribute\> )
+-- | @( set-option \<attribute\> )@
 setOptionAttribute :: ByteString -> Maybe (AttributeValue) -> Command
 setOptionAttribute kywd = SetOption . optionAttribute kywd
 
