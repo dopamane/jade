@@ -26,11 +26,13 @@ executable subpar
     -- Modules included in this executable, other than Main.
     -- other-modules:
 
-    other-extensions: OverloadedStrings,
+    other-extensions: GeneralizedNewtypeDeriving,
+                      OverloadedStrings,
                       LambdaCase
     build-depends:    attoparsec,
                       base >=4.14.1.0,
                       bytestring,
+                      mtl,
                       subpar
     hs-source-dirs:   app
     ghc-options: -Wall
@@ -46,7 +48,7 @@ library
                  base,
                  hedgehog,
                  process,
-                 bytestring,
+                 bytestring >= 0.11.2.0,
 
   hs-source-dirs: src
 
