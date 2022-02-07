@@ -24,29 +24,35 @@ withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
 
 ### Construct SMT-LIB v2.6 commands:
 ```haskell
-let printSuccess = SetOption $ OptionPrintSuccess $ BValue True
-    setSmtLibVer = SetInfo $
-                     AttributeKeywordAttributeValue
-                       (Keyword $ SimpleSymbol "smt-lib-version")
-                       (AttributeValueSymbol $ Symbol "2.6")
-    setLogic = SetLogic $ Symbol "QF_LIA"
-    declareConstWInt = DeclareConst
-                         (Symbol "w")
-                         (Sort (IdentifierSymbol $ Symbol "Int") [])
+let setSmtLibVer = setInfo
+                     "smt-lib-version"
+                     (Just $
+                       AttributeValueSymbol $
+                         symbolSimpleSymbol "2.6"
+                     )
+    setLogic = SetLogic $ symbolSimpleSymbol "QF_LIA"
+    declareConst sym srt = DeclareConst
+                             (symbolSimpleSymbol sym)
+                             (Sort
+                               (IdentifierSymbol $
+                                 symbolSimpleSymbol srt
+                               )
+                               []
+                             )
     ...
 ```
 
 ### Send commands and receive responses:
 ```haskell
-transmit  :: SmtHandle -> [Command] -> IO [Result GeneralResponse]
-transmit_ :: SmtHandle -> [Command] -> IO ()
+xfer :: SmtHandle -> Command -> IO (Result GeneralResponse)
+send :: SmtHandle -> Command -> IO ()
 ```
 
 Example:
 ```haskell
 do
-  transmit smtHandle [printSuccess, setSmtLibVer, ...] >>= mapM_ printResult
-  transmit_ smtHandle [Exit]
+  mapM (xfer smtHandle) [printSuccess, setSmtLibVer, ...] >>= mapM_ printResult
+  send smtHandle [Exit]
 ```
 
 ## References
