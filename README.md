@@ -62,7 +62,13 @@ Example:
 ```haskell
 do
   mapM (xfer smtHandle) [printSuccess, setSmtLibVer, ...] >>= mapM_ printResult
-  send smtHandle [Exit]
+  send smtHandle Exit
+```
+
+### Read and write script files:
+```haskell
+readScript  :: FilePath -> IO (Result Script)
+writeScript :: FilePath -> Script -> IO ()
 ```
 
 ## References
