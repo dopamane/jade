@@ -2830,7 +2830,7 @@ parseScript = Script <$> many' parseCommand
 
 -- | Unparse 'Script'
 unparseScript :: Script -> Builder
-unparseScript (Script commands) = unlinesB $ unparseCommand <$> commands
+unparseScript = unlinesB . fmap unparseCommand . unScript
 
 
 -----------------------

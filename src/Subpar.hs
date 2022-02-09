@@ -82,5 +82,4 @@ readScript file = withBinaryFile file ReadMode $ \hndl ->
 
 -- | Write script to file.
 writeScript :: FilePath -> Script -> IO ()
-writeScript file = B.writeFile file . unparseScript 
-
+writeScript file = B.writeFile file . unparseScript
