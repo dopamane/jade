@@ -1,8 +1,16 @@
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE OverloadedStrings          #-}
 module Main where
 
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.Reader (
+  ReaderT(runReaderT),
+  MonadReader,
+  ask,
+  )
 import Criterion.Main
+import Data.Attoparsec.ByteString (Result)
 import Data.Attoparsec.Text (IResult(Done))
 import Data.ByteString.Builder (toLazyByteString)
 import qualified Data.ByteString.Lazy.Char8 as C
@@ -12,20 +20,25 @@ import Subpar (
   Command(..),
   Identifier(..),
   InfoFlag(..),
+  GeneralResponse(..),
   QualIdentifier(..),
+  Script(..),
   SmtHandle(..),
   Sort(..),
   Term(..),
   pop,
   push,
-  send,
   setInfo,
   setOptionPrintSuccess,
   symbolSimpleSymbol,
   unparseCommand,
   unparseGeneralResponse,
   withSmtProcess,
-  xfer,
+  )
+import qualified Subpar as Subpar (
+  readScript,
+  send,
+  xfer
   )
 import System.IO (
   hSetBinaryMode,
@@ -34,7 +47,53 @@ import System.IO (
   )
 
 main :: IO ()
-main = defaultMain [bench "Ex 3.10" $ nfIO ex310]
+main = defaultMain
+  [ bench "Ex 3.10" $ nfIO ex310
+  , bench "SMT-LIB-benchmarks/QF_LIA/check/bignum_lia1.smt2" $
+      nfIO qfLiaCheckBignumLia1
+  ]
+
+
+qfLiaCheckBignumLia1 :: IO [Result GeneralResponse]
+qfLiaCheckBignumLia1 = runZ3 $ do
+  resultScript <- readScript "SMT-LIB-benchmarks/QF_LIA/check/bignum_lia1.smt2"
+  case resultScript of
+    Done _ (Script cmds) -> do
+      send $ take 13 cmds
+      result <- xfer [cmds !! 13]
+      send [last cmds]
+      return result
+    _ -> error "Could not parse script."
+
+--------------
+-- Monad --
+--------------
+newtype Smt a = Smt{ unSmt :: ReaderT SmtHandle IO a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadReader SmtHandle)
+
+runSmt :: FilePath -> [String] -> Smt a -> IO a
+runSmt exe args action = withSmtProcess exe args $ \hndl -> do
+  hSetBinaryMode (smtIn  hndl) True
+  hSetBinaryMode (smtOut hndl) True
+  hSetBuffering  (smtIn  hndl) LineBuffering
+  hSetBuffering  (smtOut hndl) LineBuffering 
+  runReaderT (unSmt action) hndl
+
+runZ3 :: Smt a -> IO a
+runZ3 = runSmt "z3" ["-smt2", "-in"]
+
+xfer :: [Command] -> Smt [Result GeneralResponse]
+xfer cmds = do
+  hndl <- ask
+  liftIO $ mapM (Subpar.xfer hndl) cmds
+
+send :: [Command] -> Smt ()
+send cmds = do
+  hndl <- ask
+  liftIO $ mapM_ (Subpar.send hndl) cmds
+
+readScript :: FilePath -> Smt (Result Script)
+readScript = liftIO . Subpar.readScript
 
 {-
 ex311 :: IO ()
@@ -45,12 +104,8 @@ ex311 = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
   hSetBuffering  (smtOut smtHandle) LineBuffering
 -}  
 
-ex310 :: IO ()
-ex310 = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
-  hSetBinaryMode (smtIn  smtHandle) True
-  hSetBinaryMode (smtOut smtHandle) True
-  hSetBuffering  (smtIn  smtHandle) LineBuffering
-  hSetBuffering  (smtOut smtHandle) LineBuffering
+ex310 :: IO [Result GeneralResponse]
+ex310 = runZ3 $ do
   let setSmtLibVer = setInfo
                        "smt-lib-version"
                        (Just $
@@ -88,7 +143,7 @@ ex310 = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
                          )
       getInfoAllStatistics = GetInfo InfoFlagAllStatistics
                             
-  mapM (xfer smtHandle)
+  resps <- xfer
     [ setOptionPrintSuccess True
     , setSmtLibVer
     , setLogicQFLIA
@@ -98,26 +153,20 @@ ex310 = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
     , declareConst "z" "Int"
     , assertGt "x" "y"
     , assertGt "y" "z"
-    ] >>= mapM_ printResult
-  mapM_ (send smtHandle)
+    ]
+  send
     [ setOptionPrintSuccess False
     , push 1
     , assertGt "z" "x"
     ]
-  mapM (xfer smtHandle)
-    [ CheckSat
-    , getInfoAllStatistics
-    ] >>= mapM_ printResult
-  mapM_ (send smtHandle)
+  checkSatInfo <- xfer [CheckSat, getInfoAllStatistics]
+  send
     [ pop 1
     , push 1
     ]
-  xfer smtHandle CheckSat >>= printResult
-  send smtHandle Exit
-  where
-    printResult = \case
-      Done _ r -> C.putStrLn $ toLazyByteString $ unparseGeneralResponse r
-      r -> error $ show r
+  checkSatResp <- xfer [CheckSat]
+  send [Exit]
+  return $ resps ++ checkSatInfo ++ checkSatResp
   
 {-
 ex311 :: IO ()

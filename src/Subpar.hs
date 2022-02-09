@@ -28,10 +28,8 @@ module Subpar (
 import Data.Attoparsec.ByteString.Char8 (Result, parseWith)
 import Data.ByteString.Builder (hPutBuilder, char8)
 import qualified Data.ByteString.Builder as B (writeFile)
-import Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as C
+import qualified Data.ByteString.Char8 as C (empty, hGetLine)
 import System.IO (
-  Handle,
   IOMode(ReadMode),
   hIsEOF,
   hReady,

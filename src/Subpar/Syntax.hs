@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData        #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -389,6 +391,7 @@ module Subpar.Syntax (
     syntaxTests
 ) where
 
+import Control.DeepSeq (NFData)
 import Data.Attoparsec.ByteString.Char8 (
   Parser,
   char,
@@ -426,11 +429,12 @@ import Data.ByteString.Builder (
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as C
 import Data.ByteString.Lazy.Char8 (toStrict)
-import Prelude hiding (takeWhile)
-
+import GHC.Generics (Generic)
 import           Hedgehog hiding (Command)
 import qualified Hedgehog.Gen   as Gen
 import qualified Hedgehog.Range as Range
+import Prelude hiding (takeWhile)
+
 
 
 -- | unwords for builders; intersperse spaces.
@@ -455,7 +459,7 @@ par p = char p >> skipSpace
 
 -- | Reserved words
 newtype Reserved = Reserved{ unReserved :: ByteString }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 reserved :: [ByteString]
 reserved =
@@ -514,7 +518,7 @@ unparseReserved = byteString . unReserved
 
 -- | @\<numeral\> ::= 0 | a non-empty sequence of digits not starting with 0@
 newtype Numeral = Numeral{ unNumeral :: Integer }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'Numeral'
 parseNumeral :: Parser Numeral
@@ -540,7 +544,7 @@ prop_numeral_forward = property $ do
 
 -- | @\<decimal\> ::= \<numeral\>.0*\<numeral\>@
 newtype Decimal = Decimal{ unDecimal :: Double }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'Decimal'
 parseDecimal :: Parser Decimal
@@ -558,7 +562,7 @@ letters from A to F, capitalized or not
 @
 -}
 newtype Hexadecimal = Hexadecimal{ unHexadecimal :: Integer }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'Hexadecimal'
 parseHexadecimal :: Parser Hexadecimal
@@ -580,7 +584,7 @@ prop_hexadecimal_forward = property $ do
 
 -- | @\<binary\> ::= #b followed by a non-empty sequence of 0 and 1 characters@
 newtype Binary = Binary{ unBinary :: Integer }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'Binary'
 parseBinary :: Parser Binary
@@ -620,7 +624,7 @@ quotes with escape sequence ""
 @
 -}
 newtype SString = SString{ unSString :: ByteString }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'SString'.
 -- See [StackOverflow thread](https://stackoverflow.com/a/35302838/4051020).
@@ -654,7 +658,7 @@ characters + - / * = % ? ! . $ _ ~ ^ < > \@ that does not start with a digit.
 @
 -}
 newtype SimpleSymbol = SimpleSymbol{ unSimpleSymbol :: ByteString }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'SimpleSymbol'
 parseSimpleSymbol :: Parser SimpleSymbol
@@ -696,7 +700,7 @@ unparseSimpleSymbol = byteString . unSimpleSymbol
 -}
 data Symbol = SymbolSimpleSymbol SimpleSymbol
             | SymbolQuoted ByteString
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Construct 'SymbolSimpleSymbol'
 symbolSimpleSymbol :: ByteString -> Symbol
@@ -719,7 +723,7 @@ unparseSymbol = \case
 
 -- | @\<keyword\> ::= :\<simple_symbol\>@
 newtype Keyword = Keyword{ unKeyword :: SimpleSymbol }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Construct 'Keyword'
 keyword :: ByteString -> Keyword
@@ -759,7 +763,7 @@ data SpecConstant
     SpecConstantBinary Binary
   | -- | \<string\>
     SpecConstantString SString
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Construct 'SpecConstantNumeral'
 specConstantNumeral :: Integer -> SpecConstant
@@ -815,7 +819,7 @@ data SExpr = SExprSpecConstant SpecConstant -- ^ \<spec_constant\>
            | SExprReserved Reserved         -- ^ \<reserved\>
            | SExprKeyword Keyword           -- ^ \<keyword\>
            | SExprs [SExpr]                 -- ^ ( \<s_expr\>* )
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Construct 'SExprReserved'. Warning: this function does not check that
 -- 'ByteString' is a reserved word.
@@ -854,7 +858,7 @@ unparseSExpr = \case
 -- | @\<index\> ::= \<numeral\> | \<symbol\>@
 data Index = IndexNumeral Numeral -- ^ \<numeral\>
            | IndexSymbol  Symbol  -- ^ \<symbol\>
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Construct 'IndexNumeral'
 indexNumeral :: Integer -> Index
@@ -880,7 +884,7 @@ data Identifier
     IdentifierSymbol Symbol
   | -- | ( _ \<symbol\> \<index\>+ )
     IdentifierUnderscore Symbol (NonEmpty Index)
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'Identifier'
 parseIdentifier :: Parser Identifier
@@ -916,7 +920,7 @@ unparseIdentifier = \case
 
 -- | @\<sort\> ::= \<identifier\> | ( \<identifier\> \<sort\>+ )@
 data Sort = Sort Identifier [Sort]
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'Sort'
 parseSort :: Parser Sort
@@ -953,7 +957,7 @@ data AttributeValue
   = AttributeValueSpecConstant SpecConstant -- ^ \<spec_constant\>
   | AttributeValueSymbol Symbol             -- ^ \<symbol\>
   | AttributeValueSExprs [SExpr]            -- ^ ( \<s_expr\>* )
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'AttributeValue'
 parseAttributeValue :: Parser AttributeValue
@@ -977,7 +981,7 @@ data Attribute = Attribute
   { attributeKeyword        :: Keyword
   , attributeAttributeValue :: Maybe AttributeValue
   }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Construct 'Attribute'
 attribute ::
@@ -1013,7 +1017,7 @@ data QualIdentifier
     QualIdentifier Identifier
   | -- | ( as \<identifier\> \<sort\> )
     QualIdentifierAs Identifier Sort
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'QualIdentifier'
 parseQualIdentifier :: Parser QualIdentifier
@@ -1048,7 +1052,7 @@ data VarBinding = VarBinding
   { varBindingSymbol :: Symbol
   , varBindingTerm   :: Term
   }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'VarBinding'
 parseVarBinding :: Parser VarBinding
@@ -1072,7 +1076,7 @@ data SortedVar = SortedVar
   { sortedVarSymbol :: Symbol
   , sortedVarSort   :: Sort
   }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'SortedVar'
 parseSortedVar :: Parser SortedVar
@@ -1095,7 +1099,7 @@ data Pattern
     Pattern Symbol
   | -- | ( \<symbol\> \<symbol\>+ )
     Patterns Symbol (NonEmpty Symbol)
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'Pattern'
 parsePattern :: Parser Pattern
@@ -1128,7 +1132,7 @@ data MatchCase = MatchCase
   { matchCasePattern :: Pattern
   , matchCaseTerm    :: Term
   }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'MatchCase'
 parseMatchCase :: Parser MatchCase
@@ -1179,7 +1183,7 @@ data Term
     TermMatch Term (NonEmpty MatchCase)
   | -- | ( ! \<term\> \<attribute\>+ )
     TermExclamation Term (NonEmpty Attribute)
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'Term'
 parseTerm :: Parser Term
@@ -1316,7 +1320,7 @@ data SortSymbolDecl = SortSymbolDecl
   , sortSymbolDeclNumeral    :: Numeral 
   , sortSymbolDeclAttributes :: [Attribute]
   }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Construct 'SortSymbolDecl'
 sortSymbolDecl ::
@@ -1359,7 +1363,7 @@ unparseSortSymbolDecl srtSymDecl =
 data MetaSpecConstant = MetaSpecConstantNumeral -- ^ NUMERAL
                       | MetaSpecConstantDecimal -- ^ DECIMAL
                       | MetaSpecConstantString  -- ^ STRING
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'MetaSpecConstant'
 parseMetaSpecConstant :: Parser MetaSpecConstant
@@ -1390,7 +1394,7 @@ data FunSymbolDecl
     FunSymbolDeclMetaSpecConstant MetaSpecConstant Sort [Attribute]
   | -- | ( \<identifier\> \<sort\>+ \<attribute\>* )
     FunSymbolDeclIdentifier Identifier (NonEmpty Sort) [Attribute]
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'FunSymbolDecl'
 parseFunSymbolDecl :: Parser FunSymbolDecl
@@ -1462,7 +1466,7 @@ data ParFunSymbolDecl
     ParFunSymbolDeclFunSymbolDecl FunSymbolDecl
   | -- | ( par ( \<symbol\>+ ) ( \<identifier\> \<sort\>+ \<attribute\>* ) )
     Par (NonEmpty Symbol) Identifier (NonEmpty Sort) [Attribute]
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'ParFunSymbolDecl'
 parseParFunSymbolDecl :: Parser ParFunSymbolDecl
@@ -1542,7 +1546,7 @@ data TheoryAttribute
 
   | -- | \<attribute\>
     TheoryAttributeAttribute Attribute
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'TheoryAttribute'
 parseTheoryAttribute :: Parser TheoryAttribute
@@ -1611,7 +1615,7 @@ data TheoryDecl = TheoryDecl
   { theoryDeclSymbol           :: Symbol 
   , theoryDeclTheoryAttributes :: NonEmpty TheoryAttribute
   }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'TheoryDecl'
 parseTheoryDecl :: Parser TheoryDecl
@@ -1668,7 +1672,7 @@ data LogicAttribute
 
   | -- | \<attribute\>
     LogicAttributeAttribute Attribute
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'LogicAttribute'
 parseLogicAttribute :: Parser LogicAttribute
@@ -1714,7 +1718,7 @@ data Logic = Logic
   { logicSymbol          :: Symbol
   , logicLogicAttribtues :: NonEmpty LogicAttribute
   }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'Logic'
 parseLogic :: Parser Logic
@@ -1761,7 +1765,7 @@ data InfoFlag = InfoFlagAllStatistics        -- ^ :all-statistics
               | InfoFlagReasonUnknown        -- ^ :reason-unknown
               | InfoFlagVersion              -- ^ :version
               | InfoFlagKeyword Keyword      -- ^ \<keyword\>
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Construct 'InfoFlagKeyword'
 infoFlagKeyword :: ByteString -> InfoFlag
@@ -1798,7 +1802,7 @@ unparseInfoFlag = \case
 
 -- | @\<b_value\> ::= true | false@
 newtype BValue = BValue{ unBValue :: Bool }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'BValue'
 parseBValue :: Parser BValue
@@ -1877,7 +1881,7 @@ data Option
 
   | -- | \<attribute\>
     OptionAttribute Attribute
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Construct 'OptionDiagnosticOutputChannel'
 optionDiagnosticOutputChannel :: ByteString -> Option
@@ -2015,7 +2019,7 @@ data SortDec = SortDec
   { sortDecSymbol  :: Symbol
   , sortDecNumeral :: Numeral
   }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'SortDec'
 parseSortDec :: Parser SortDec
@@ -2041,7 +2045,7 @@ data SelectorDec = SelectorDec
   { selectorDecSymbol :: Symbol
   , selectorDecSort   :: Sort
   }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'SelectorDec'
 parseSelectorDec :: Parser SelectorDec
@@ -2069,7 +2073,7 @@ data ConstructorDec = ConstructorDec
   { constructorDecSymbol       :: Symbol
   , constructorDecSelectorDecs :: [SelectorDec]
   }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'ConstructorDec'
 parseConstructorDec :: Parser ConstructorDec
@@ -2101,7 +2105,7 @@ data DatatypeDec
       DatatypeDec (NonEmpty ConstructorDec)
     | -- | ( par ( \<symbol\>+ ) ( \<constructor_dec\>+ ) )
       DatatypeDecPar (NonEmpty Symbol) (NonEmpty ConstructorDec)
-    deriving (Show, Read, Eq)
+    deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'DatatypeDec'
 parseDatatypeDec :: Parser DatatypeDec
@@ -2156,7 +2160,7 @@ data FunctionDec = FunctionDec
   , functionDecSortedVars :: [SortedVar]
   , functionDecSort       :: Sort
   }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'FunctionDec'
 parseFunctionDec :: Parser FunctionDec
@@ -2190,7 +2194,7 @@ data FunctionDef = FunctionDef
   , functionDefSort       :: Sort
   , functionDefTerm       :: Term
   }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'FunctionDef'
 parseFunctionDef :: Parser FunctionDef
@@ -2215,7 +2219,7 @@ unparseFunctionDef (FunctionDef symbol sortedVars sort term) = unwordsB
 -- | @\<prop_literal\> ::= \<symbol\> | ( not \<symbol\> )@
 data PropLiteral = PropLiteralSymbol Symbol    -- ^ \<symbol\>
                  | PropLiteralNotSymbol Symbol -- ^ ( not \<symbol\> )
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'PropLiteral'
 parsePropLiteral :: Parser PropLiteral
@@ -2338,7 +2342,7 @@ data Command
     SetLogic Symbol
   | -- | ( set-option \<option\> )
     SetOption Option
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Construct 'DeclareSort'
 declareSort :: Symbol -> Integer -> Command
@@ -2822,7 +2826,7 @@ unparseCommand = \case
 
 -- | @\<script\> ::= \<command\>*@
 newtype Script = Script{ unScript :: [Command] }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'Script'
 parseScript :: Parser Script
@@ -2840,7 +2844,7 @@ unparseScript = unlinesB . fmap unparseCommand . unScript
 -- | @\<error-behavior\> ::= immediate-exit | continued-execution@
 data ErrorBehavior = ImmediateExit      -- ^ immediate-exit
                    | ContinuedExecution -- ^ continued-execution
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'ErrorBehavior'
 parseErrorBehavior :: Parser ErrorBehavior
@@ -2860,7 +2864,7 @@ unparseErrorBehavior = \case
 data ReasonUnknown = Memout              -- ^ memout
                    | Incomplete          -- ^ incomplete
                    | ReasonUnknown SExpr -- ^ \<s_expr\>
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'ReasonUnknown'
 parseReasonUnknown :: Parser ReasonUnknown
@@ -2892,7 +2896,7 @@ data ModelResponse
     ModelResponseDefineFunRec FunctionDef
   | -- | ( define-funs-rec ( \<function_dec\>n+1 ) ( \<term\>n+1 ) )
     ModelResponseDefineFunsRec (NonEmpty (FunctionDec, Term))
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'ModelResponse'
 parseModelResponse :: Parser ModelResponse
@@ -2983,7 +2987,7 @@ data InfoResponse
     InfoResponseVersion SString
   | -- | \<attribute\>
     InfoResponseAttribute Attribute
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'InfoResponse'
 parseInfoResponse :: Parser InfoResponse
@@ -3031,7 +3035,7 @@ data ValuationPair = ValuationPair
   { valuationPairFst :: Term
   , valuationPairSnd :: Term
   }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'ValuationPair'
 parseValuationPair :: Parser ValuationPair
@@ -3053,7 +3057,7 @@ data TValuationPair = TValuationPair
   { tValuationPairSymbol :: Symbol
   , tValuationPairBValue :: BValue
   }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'TValuationPair'
 parseTValuationPair :: Parser TValuationPair
@@ -3078,7 +3082,7 @@ unparseTValuationPair (TValuationPair symbol bValue) = unwordsB
 data CheckSatResponse = Sat     -- ^ sat
                       | Unsat   -- ^ unsat
                       | Unknown -- ^ unknown
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'CheckSatResponse'
 parseCheckSatResponse :: Parser CheckSatResponse
@@ -3098,7 +3102,7 @@ unparseCheckSatResponse = byteString . \case
 
 -- | @\<echo_response\> ::= \<string\>@
 newtype EchoResponse = EchoResponse{ unEchoResponse :: SString }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'EchoResponse'
 parseEchoResponse :: Parser EchoResponse
@@ -3112,7 +3116,7 @@ unparseEchoResponse = unparseSString . unEchoResponse
 -- | @\<get_assertions_response\> ::= ( \<term\>* )@
 newtype GetAssertionsResponse = GetAssertionsResponse
   { unGetAssertionsResponse :: [Term] }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'GetAssertionsResponse'
 parseGetAssertionsResponse :: Parser GetAssertionsResponse
@@ -3134,7 +3138,7 @@ unparseGetAssertionsResponse (GetAssertionsResponse terms) = unwordsB
 -- | @\<get_assignment_response\> ::= ( \<t_valuation_pair\>* )@
 newtype GetAssignmentResponse = GetAssignmentResponse
   { unGetAssignmentResponse :: [TValuationPair] }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'GetAssignmentResponse'
 parseGetAssignmentResponse :: Parser GetAssignmentResponse
@@ -3156,7 +3160,7 @@ unparseGetAssignmentResponse (GetAssignmentResponse tValuationPairs) = unwordsB
 -- | @\<get_info_response\> ::= ( \<info_response\>+ )@
 newtype GetInfoResponse = GetInfoResponse
   { unGetInfoResponse :: NonEmpty InfoResponse }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'GetInfoResponse'
 parseGetInfoResponse :: Parser GetInfoResponse
@@ -3178,7 +3182,7 @@ unparseGetInfoResponse (GetInfoResponse infoResponses) = unwordsB
 -- | @\<get_model_response\> ::= ( \<model_response\>* )@
 newtype GetModelResponse = GetModelResponse
   { unGetModelResponse :: [ModelResponse] }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'GetModelResponse'
 parseGetModelResponse :: Parser GetModelResponse
@@ -3200,7 +3204,7 @@ unparseGetModelResponse (GetModelResponse modelResponses) = unwordsB
 -- | @\<get_option_response\> ::= \<attribute_value\>@
 newtype GetOptionResponse = GetOptionResponse
   { unGetOptionResponse :: AttributeValue }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'GetOptionResponse'
 parseGetOptionResponse :: Parser GetOptionResponse
@@ -3214,7 +3218,7 @@ unparseGetOptionResponse = unparseAttributeValue . unGetOptionResponse
 -- | @\<get_proof_response\> ::= \<s_expr\>@
 newtype GetProofResponse = GetProofResponse
   { unGetProofResponse :: SExpr }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'GetProofResponse'
 parseGetProofResponse :: Parser GetProofResponse
@@ -3228,7 +3232,7 @@ unparseGetProofResponse = unparseSExpr . unGetProofResponse
 -- | @\<get_unsat_assumptions_response\> ::= ( \<symbol\>* )@
 newtype GetUnsatAssumptionsResponse = GetUnsatAssumptionsResponse
   { unGetUnsatAssumptionsResponse :: [Symbol] }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'GetUnsatAssumptionsResponse'
 parseGetUnsatAssumptionsResponse :: Parser GetUnsatAssumptionsResponse
@@ -3250,7 +3254,7 @@ unparseGetUnsatAssumptionsResponse (GetUnsatAssumptionsResponse r) = unwordsB
 -- | @\<get_unsat_core_response\> ::= ( \<symbol\>* )@
 newtype GetUnsatCoreResponse = GetUnsatCoreResponse
   { unGetUnsatCoreResponses :: [Symbol] }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'GetUnsatCoreResponse'
 parseGetUnsatCoreResponse :: Parser GetUnsatCoreResponse
@@ -3272,7 +3276,7 @@ unparseGetUnsatCoreResponse (GetUnsatCoreResponse symbols) = unwordsB
 -- | @\<get_value_response\> ::= ( \<valuation_pair\>+ )@
 newtype GetValueResponse = GetValueResponse
   { unGetValueResponse :: NonEmpty ValuationPair }
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'GetValueResponse'
 parseGetValueResponse :: Parser GetValueResponse
@@ -3329,7 +3333,7 @@ data SpecificSuccessResponse
     SpecificSuccessResponseGetUnsatCoreResponse GetUnsatCoreResponse
   | -- | \<get_value_response\>
     SpecificSuccessResponseGetValueResponse GetValueResponse
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'SpecificSuccessResponse'
 parseSpecificSuccessResponse :: Command -> Parser SpecificSuccessResponse
@@ -3404,7 +3408,7 @@ data GeneralResponse
     GeneralResponseUnsupported
   | -- | ( error \<string\> )
     GeneralResponseError SString
-  deriving (Show, Read, Eq)
+  deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Parse 'GeneralResponse'
 parseGeneralResponse :: Command -> Parser GeneralResponse
