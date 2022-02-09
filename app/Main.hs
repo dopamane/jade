@@ -78,7 +78,7 @@ main = do
     Done _ (Script cmds) -> 
       runSmt "z3" ["-smt2", "-in"] $ do
         send $ take 13 cmds
-        result <- xfer [cmds !! 14]
+        result <- xfer [cmds !! 13]
         send [last cmds] -- exit
         printResults result
     _ -> error "Could not parse script."
