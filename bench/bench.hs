@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings          #-}
 module Main where
 
+import Control.Monad (forM)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (
   ReaderT(runReaderT),
@@ -26,6 +27,7 @@ import Subpar (
   SmtHandle(..),
   Sort(..),
   Term(..),
+  hasSpecificSuccessResponse,
   pop,
   push,
   setInfo,
@@ -48,15 +50,19 @@ import System.IO (
 
 main :: IO ()
 main = defaultMain
-  [ bench "Ex 3.10" $ nfIO ex310
-  , bench "SMT-LIB-benchmarks/QF_LIA/check/bignum_lia1.smt2" $
+  [ --bench "Ex 3.10" $ nfIO ex310
+    bench "SMT-LIB-benchmarks/QF_LIA/check/bignum_lia1.smt2" $
       nfIO qfLiaCheckBignumLia1
   ]
 
 
-qfLiaCheckBignumLia1 :: IO [Result GeneralResponse]
+qfLiaCheckBignumLia1 :: IO [Maybe (Result GeneralResponse)]
 qfLiaCheckBignumLia1 = runZ3 $ do
   resultScript <- readScript "SMT-LIB-benchmarks/QF_LIA/check/bignum_lia1.smt2"
+  case resultScript of
+    Done _ script -> transmit script
+    _ -> error "Could not parse script."
+{-
   case resultScript of
     Done _ (Script cmds) -> do
       send $ take 13 cmds
@@ -64,7 +70,7 @@ qfLiaCheckBignumLia1 = runZ3 $ do
       send [last cmds]
       return result
     _ -> error "Could not parse script."
-
+-}
 --------------
 -- Monad --
 --------------
@@ -82,15 +88,13 @@ runSmt exe args action = withSmtProcess exe args $ \hndl -> do
 runZ3 :: Smt a -> IO a
 runZ3 = runSmt "z3" ["-smt2", "-in"]
 
-xfer :: [Command] -> Smt [Result GeneralResponse]
-xfer cmds = do
+transmit :: Script -> Smt [Maybe (Result GeneralResponse)]
+transmit script = do
   hndl <- ask
-  liftIO $ mapM (Subpar.xfer hndl) cmds
-
-send :: [Command] -> Smt ()
-send cmds = do
-  hndl <- ask
-  liftIO $ mapM_ (Subpar.send hndl) cmds
+  liftIO $ forM (unScript script) $ \cmd ->
+    if hasSpecificSuccessResponse cmd
+      then Just    <$> Subpar.xfer hndl cmd
+      else Nothing <$  Subpar.send hndl cmd
 
 readScript :: FilePath -> Smt (Result Script)
 readScript = liftIO . Subpar.readScript
@@ -103,7 +107,7 @@ ex311 = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
   hSetBuffering  (smtIn  smtHandle) LineBuffering
   hSetBuffering  (smtOut smtHandle) LineBuffering
 -}  
-
+{-
 ex310 :: IO [Result GeneralResponse]
 ex310 = runZ3 $ do
   let setSmtLibVer = setInfo
@@ -167,7 +171,7 @@ ex310 = runZ3 $ do
   checkSatResp <- xfer [CheckSat]
   send [Exit]
   return $ resps ++ checkSatInfo ++ checkSatResp
-  
+-}  
 {-
 ex311 :: IO ()
 ex311 = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do

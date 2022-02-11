@@ -381,6 +381,7 @@ module Subpar.Syntax (
     SpecificSuccessResponse (..),
     parseSpecificSuccessResponse,
     unparseSpecificSuccessResponse,
+    hasSpecificSuccessResponse,
 
     -- *** GeneralResponse
     GeneralResponse (..),
@@ -3390,6 +3391,23 @@ unparseSpecificSuccessResponse = \case
   SpecificSuccessResponseGetValueResponse getValueResponse ->
     unparseGetValueResponse getValueResponse
 
+-- | Returns 'True' if the 'Command' has a 'SpecificSuccessResponse', otherwise
+-- 'False'.
+hasSpecificSuccessResponse :: Command -> Bool
+hasSpecificSuccessResponse = \case
+  CheckSat            -> True
+  CheckSatAssuming _  -> True
+  Echo _              -> True
+  GetAssertions       -> True
+  GetAssignment       -> True
+  GetInfo _           -> True
+  GetModel            -> True
+  GetOption _         -> True
+  GetProof            -> True
+  GetUnsatAssumptions -> True
+  GetUnsatCore        -> True
+  GetValue _          -> True
+  _                   -> False
 
 {- |
 @
