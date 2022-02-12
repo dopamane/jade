@@ -29,12 +29,11 @@ module Subpar (
 import Data.Attoparsec.ByteString.Char8 (Result, parseWith)
 import Data.ByteString.Builder (hPutBuilder, char8)
 import qualified Data.ByteString.Builder as B (writeFile)
-import qualified Data.ByteString.Char8 as C (empty, hGetLine)
+import qualified Data.ByteString.Char8 as C (empty, hGetLine, hGetSome)
 import Subpar.Process
 import Subpar.Syntax
 import System.IO (
   IOMode(ReadMode),
-  hIsEOF,
   hReady,
   withBinaryFile,
   )
@@ -78,13 +77,7 @@ recv (smtOut -> hndl) cmd =
 -- | Read script from file.
 readScript :: FilePath -> IO (Result Script)
 readScript file = withBinaryFile file ReadMode $ \hndl ->
-  parseWith (refill hndl) parseScript =<< C.hGetLine hndl
-  where
-    refill hndl = do
-      eof <- hIsEOF hndl
-      if eof
-        then return C.empty
-        else C.hGetLine hndl
+  parseWith (C.hGetSome hndl 2048) parseScript C.empty
 
 -- | Write script to file.
 writeScript :: FilePath -> Script -> IO ()

@@ -63,6 +63,7 @@ test-suite test
   build-depends:    attoparsec,
                     base,
                     bytestring,
+                    directory,
                     hedgehog,
                     HUnit,
                     process,
