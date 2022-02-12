@@ -17,82 +17,66 @@ category:           SMT, Formal Methods, Theorem Provers, Math, System
 extra-source-files: CHANGELOG.md
 
 source-repository head
-    type:     git
-    location: https://github.com/dopamane/subpar
-
-executable subpar
-    main-is:          Main.hs
-
-    -- Modules included in this executable, other than Main.
-    -- other-modules:
-
-    other-extensions: GeneralizedNewtypeDeriving,
-                      OverloadedStrings,
-                      LambdaCase
-    build-depends:    attoparsec,
-                      base >=4.14.1.0,
-                      bytestring,
-                      mtl,
-                      subpar
-    hs-source-dirs:   app
-    ghc-options: -Wall
-    default-language: Haskell2010
+  type:     git
+  location: https://github.com/dopamane/subpar
 
 library
-  exposed-modules: Subpar
-
-  other-modules: Subpar.Process,
-                 Subpar.Syntax
-
-  build-depends: attoparsec,
-                 base,
-                 deepseq,
-                 hedgehog,
-                 process,
-                 bytestring >= 0.11.2.0,
-
-  hs-source-dirs: src
-
-  ghc-options: -Wall
+  exposed-modules:  Subpar
+  other-modules:    Subpar.Process,
+                    Subpar.Syntax
+  build-depends:    attoparsec,
+                    base,
+                    deepseq,
+                    hedgehog,
+                    process,
+                    bytestring >= 0.11.2.0,
+  hs-source-dirs:   src
+  ghc-options:      -Wall
   other-extensions: DeriveAnyClass,
                     DeriveGeneric,
                     OverloadedStrings,
                     StrictData,
                     TemplateHaskell,
                     ViewPatterns
-  default-extensions: LambdaCase
-
   default-language: Haskell2010
 
-test-suite test
-  type: exitcode-stdio-1.0
-
-  main-is: test.hs
-
+library subpar-extra
+  exposed-modules: Subpar,
+                   Subpar.Extra.Monad,
+                   Subpar.Process,
+                   Subpar.Syntax
   build-depends: attoparsec,
                  base,
                  bytestring,
+                 deepseq,
                  hedgehog,
-                 HUnit,
                  mtl,
                  process,
                  subpar
+  hs-source-dirs: src
+  ghc-options: -Wall
+  default-language: Haskell2010
 
-  ghc-options: -Wall -threaded -O2
-
-  hs-source-dirs: test
-
+test-suite test
+  type:             exitcode-stdio-1.0
+  main-is:          test.hs
+  build-depends:    attoparsec,
+                    base,
+                    bytestring,
+                    hedgehog,
+                    HUnit,
+                    process,
+                    subpar-extra
+  ghc-options:      -Wall -threaded -O2
+  hs-source-dirs:   test
   default-language: Haskell2010
 
 benchmark bench
-  type: exitcode-stdio-1.0
-  main-is: bench.hs
-  hs-source-dirs: bench
-  ghc-options: -Wall -O2
-  build-depends: attoparsec,
-                 base,
-                 bytestring,
-                 criterion,
-                 mtl,
-                 subpar,
+  type:             exitcode-stdio-1.0
+  main-is:          bench.hs
+  hs-source-dirs:   bench
+  ghc-options:      -Wall -O2
+  build-depends:    base,
+                    criterion,
+                    subpar-extra,
   default-language: Haskell2010
