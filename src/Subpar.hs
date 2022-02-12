@@ -13,6 +13,7 @@ module Subpar (
 
   -- * Transfer
   xfer,
+  xferM,
   send,
   recv,
 
@@ -29,15 +30,14 @@ import Data.Attoparsec.ByteString.Char8 (Result, parseWith)
 import Data.ByteString.Builder (hPutBuilder, char8)
 import qualified Data.ByteString.Builder as B (writeFile)
 import qualified Data.ByteString.Char8 as C (empty, hGetLine)
+import Subpar.Process
+import Subpar.Syntax
 import System.IO (
   IOMode(ReadMode),
   hIsEOF,
   hReady,
   withBinaryFile,
   )
-
-import Subpar.Process
-import Subpar.Syntax
 
 --------------
 -- Transfer --
@@ -47,11 +47,19 @@ import Subpar.Syntax
 xfer :: SmtHandle -> Command -> IO (Result GeneralResponse)
 xfer hndl cmd = send hndl cmd >> recv hndl cmd
 
+-- | Send a 'Command' and receive 'Maybe GeneralResponse'. This function only
+-- waits for responses from 'Command's that have 'SpecificSuccessResponse's.
+-- See 'hasSpecificSuccessResponse'.
+xferM :: SmtHandle -> Command -> IO (Maybe (Result GeneralResponse))
+xferM hndl cmd = if hasSpecificSuccessResponse cmd
+                   then Just    <$> xfer hndl cmd
+                   else Nothing <$  send hndl cmd
+
 -- | Send a 'Command'.
 send :: SmtHandle -> Command -> IO ()
 send (smtIn -> hndl) cmd = hPutBuilder hndl $ unparseCommand cmd <> char8 '\n'
 
--- | Receive 'GeneralResponse'. 'Command' is needed to unambiguously parse a
+-- | Receive 'GeneralResponse'. 'Command' is only used to unambiguously parse
 -- 'SpecificSuccessResponse'.
 -- See 'xfer'.
 recv :: SmtHandle -> Command -> IO (Result GeneralResponse)

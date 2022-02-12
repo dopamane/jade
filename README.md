@@ -5,7 +5,7 @@ Haskell SMT Interface. Under construction. :construction:
 ```bash
 git clone https://github.com/dopamane/subpar
 
-# SMT-LIB-benchmarks submodule; necessary for testing and benchmarking
+# SMT-LIB-benchmarks submodule; skip if not running tests and benchmarks
 git submodule update --init --recursive
 
 cabal build

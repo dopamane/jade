@@ -15,19 +15,11 @@ import Subpar.Extra.Monad (
   runZ3
   )
 import System.Exit (exitFailure)
-import System.IO (
-  BufferMode(LineBuffering),
-  hSetBuffering,
-  stdout,
-  stderr
-  )
 import System.Process (CreateProcess, readCreateProcess, shell)
 import Test.HUnit (Test(..), assertEqual, runTestTTAndExit)
 
 main :: IO ()
 main = do
-  hSetBuffering stdout LineBuffering
-  hSetBuffering stderr LineBuffering
 
   result <- syntaxTests
   unless result exitFailure
@@ -41,6 +33,7 @@ benchFiles =
   , "SMT-LIB-benchmarks/QF_LIA/check/int_incompleteness1.smt2"
   , "SMT-LIB-benchmarks/QF_LIA/check/int_incompleteness2.smt2"
   , "SMT-LIB-benchmarks/QF_LIA/check/int_incompleteness3.smt2"
+-- incorrect parse , "SMT-LIB-benchmarks/QF_LIA/convert/convert-jpg2gif-query-1139.smt2"
   ]
 
 testBench :: FilePath -> Test
