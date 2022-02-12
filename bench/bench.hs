@@ -51,26 +51,17 @@ import System.IO (
 main :: IO ()
 main = defaultMain
   [ --bench "Ex 3.10" $ nfIO ex310
-    bench "SMT-LIB-benchmarks/QF_LIA/check/bignum_lia1.smt2" $
-      nfIO qfLiaCheckBignumLia1
+    benchScript "SMT-LIB-benchmarks/QF_LIA/check/bignum_lia1.smt2"
+  , benchScript "SMT-LIB-benchmarks/QF_LIA/check/bignum_lia2.smt2"
+  , benchScript "SMT-LIB-benchmarks/QF_LIA/cut_lemmas/20-vars/cut_lemma_01_001.smt2"
+  , benchScript
+      "SMT-LIB-benchmarks/QF_LIA/2019-ezsmt/travellingSalesperson/SCC/tsp_rand_70_300_1155482584_0.lp.smt2"
   ]
 
 
-qfLiaCheckBignumLia1 :: IO [Maybe (Result GeneralResponse)]
-qfLiaCheckBignumLia1 = runZ3 $ do
-  resultScript <- readScript "SMT-LIB-benchmarks/QF_LIA/check/bignum_lia1.smt2"
-  case resultScript of
-    Done _ script -> transmit script
-    _ -> error "Could not parse script."
-{-
-  case resultScript of
-    Done _ (Script cmds) -> do
-      send $ take 13 cmds
-      result <- xfer [cmds !! 13]
-      send [last cmds]
-      return result
-    _ -> error "Could not parse script."
--}
+benchScript :: FilePath -> Benchmark
+benchScript file = bench file $ nfIO $ runZ3 $ runScript file
+
 --------------
 -- Monad --
 --------------
@@ -99,14 +90,11 @@ transmit script = do
 readScript :: FilePath -> Smt (Result Script)
 readScript = liftIO . Subpar.readScript
 
-{-
-ex311 :: IO ()
-ex311 = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
-  hSetBinaryMode (smtInt smtHandle) True
-  hSetBinaryMode (smtOut smtHandle) True
-  hSetBuffering  (smtIn  smtHandle) LineBuffering
-  hSetBuffering  (smtOut smtHandle) LineBuffering
--}  
+runScript :: FilePath -> Smt [Maybe (Result GeneralResponse)]
+runScript file = readScript file >>= \case
+  Done _ script -> transmit script
+  _ -> error "Could not parse script."
+
 {-
 ex310 :: IO [Result GeneralResponse]
 ex310 = runZ3 $ do
@@ -172,30 +160,3 @@ ex310 = runZ3 $ do
   send [Exit]
   return $ resps ++ checkSatInfo ++ checkSatResp
 -}  
-{-
-ex311 :: IO ()
-ex311 = withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
-    hSetBuffering (smtIn smtHandle) LineBuffering
-    hSetBuffering (smtOut smtHandle) LineBuffering
-    transmit_
-        smtHandle
-        [ SetOption $ PrintSuccess False
-        , SetOption $ ProduceModels True
-        , DeclareConst "x" "Int"
-        , DeclareConst "y" "Int"
-        , DeclareFun "f" ["Int"] "Int"
-        , Assert "(= (f x) (f y))"
-        , Assert "(not (= x y))"
-        ]
-    transmit smtHandle [CheckSat, GetValue "(x y)"] >>= mapM_ TIO.putStrLn
-    transmit_ smtHandle [DeclareConst "a" "(Array Int (List Int))"]
-    transmit
-        smtHandle
-        [ CheckSat
-        , GetValue "(a)"
-        , GetValue "((select @const 2))"
-        , GetValue "((first @list0) (rest @list0))"
-        ]
-        >>= mapM_ TIO.putStrLn
-
--}
