@@ -29,8 +29,8 @@ main = do
 
 benchFiles :: IO [FilePath]
 benchFiles = do
-  qfLiaCheck <- listDirectory "SMT-LIB-benchmarks/QF_LIA/check"
-  calypto    <- listDirectory "SMT-LIB-benchmarks/QF_LIA/calypto"
+  qfLiaCheck <- listDirectory =<< makeAbsolute "SMT-LIB-benchmarks/QF_LIA/check"
+  calypto    <- listDirectory =<< makeAbsolute "SMT-LIB-benchmarks/QF_LIA/calypto"
   mapM makeAbsolute $ map ("SMT-LIB-benchmarks/QF_LIA/" <>) $
     map ("check/" <>) qfLiaCheck
       ++ map ("calypto/" <>) calypto
