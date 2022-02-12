@@ -69,8 +69,13 @@ test-suite test
 
   main-is: test.hs
 
-  build-depends: base,
+  build-depends: attoparsec,
+                 base,
+                 bytestring,
                  hedgehog,
+                 HUnit,
+                 mtl,
+                 process,
                  subpar
 
   ghc-options: -Wall -threaded -O2
