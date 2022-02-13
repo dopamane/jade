@@ -2,7 +2,7 @@
 Haskell [SMT](https://smtlib.cs.uiowa.edu/) interface. Under construction. :construction:
 
 ## Build
-```bash
+```
 git clone https://github.com/dopamane/subpar
 
 # SMT-LIB-benchmarks submodule; skip if not running tests and benchmarks
