@@ -1,5 +1,5 @@
 # subpar :golf:
-Haskell SMT Interface. Under construction. :construction:
+Haskell [SMT](https://smtlib.cs.uiowa.edu/) interface. Under construction. :construction:
 
 ## Build
 ```bash
@@ -9,6 +9,15 @@ git clone https://github.com/dopamane/subpar
 git submodule update --init --recursive
 
 cabal build
+
+# documentation
+cabal haddock
+
+# test
+cabal test
+
+# benchmark
+cabal bench
 ```
 
 ## Usage
@@ -29,7 +38,7 @@ withSmtProcess "z3" ["-smt2", "-in"] $ \smtHandle -> do
   hSetBinaryMode (smtOut smtHandle) True
   hSetBuffering  (smtIn  smtHandle) LineBuffering
   hSetBuffering  (smtOut smtHandle) LineBuffering
-  ...
+  someIOAction
 ```
 
 ### Construct SMT-LIB v2.6 commands:
@@ -49,13 +58,13 @@ let setSmtLibVer = setInfo
                                )
                                []
                              )
-    ...
 ```
 
 ### Send commands and receive responses:
 ```haskell
-xfer :: SmtHandle -> Command -> IO (Result GeneralResponse)
-send :: SmtHandle -> Command -> IO ()
+xfer  :: SmtHandle -> Command -> IO (Result GeneralResponse)
+xferM :: SmtHandle -> Command -> IO (Maybe (Result GeneralResponse))
+send  :: SmtHandle -> Command -> IO ()
 ```
 
 Example:
