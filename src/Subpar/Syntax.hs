@@ -400,6 +400,7 @@ import Data.Attoparsec.ByteString.Char8 (
   choice,
   decimal,
   double,
+  endOfLine,
   hexadecimal,
   isAlpha_iso8859_15,
   isDigit,
@@ -409,16 +410,18 @@ import Data.Attoparsec.ByteString.Char8 (
   parseOnly,
   peekChar,
   satisfy,
-  skipSpace,
+  skipWhile,
   string,
   takeWhile,
   takeWhile1
   )
+import qualified Data.Attoparsec.ByteString.Char8 as C (skipSpace)
 import Data.Bits ((.|.), shiftL)
 import Data.Char (ord)
 import Data.Functor (($>))
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
+import Data.Maybe (catMaybes)
 import Data.ByteString.Builder (
   Builder, 
   byteString, 
@@ -458,6 +461,23 @@ unlinesB []     = mempty
 par :: Char -> Parser ()
 par p = char p >> skipSpace
 
+-- | Skip inline-comments and spaces
+skipSpace :: Parser ()
+skipSpace = C.skipSpace >> skipInlineComment >> C.skipSpace
+  where
+    skipInlineComment = peekChar >>= \case
+      Just ';' -> skipWhile (not . eol) >> endOfLine
+      _ -> return ()
+      where
+        eol c = c == '\n' || c == '\r'
+
+-- | Skip line comments
+skipLineComment :: Parser ()
+skipLineComment = do
+  _ <- char ';'
+  skipWhile (not . eol) >> endOfLine
+  where
+    eol c = c == '\n' || c == '\r'
 
 -- | Reserved words
 newtype Reserved = Reserved{ unReserved :: ByteString }
@@ -2832,7 +2852,12 @@ newtype Script = Script{ unScript :: [Command] }
 
 -- | Parse 'Script'
 parseScript :: Parser Script
-parseScript = Script <$> many' parseCommand
+parseScript = Script . catMaybes <$> many' parseLine
+  where
+    parseLine = choice
+      [ Just    <$> parseCommand
+      , Nothing <$  skipLineComment
+      ]
 
 -- | Unparse 'Script'
 unparseScript :: Script -> Builder

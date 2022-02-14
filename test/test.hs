@@ -32,7 +32,9 @@ runBenchmarks = runTestTTAndExit . TestList . map testBench <=< traverseDirs
 
 benchFiles :: [FilePath]
 benchFiles =
-  [ "SMT-LIB-benchmarks/QF_LIA/bofill-scheduling/SMT_random_LIA/"
+  [ "SMT-LIB-benchmarks/QF_LIA/RTCL/"
+  , "SMT-LIB-benchmarks/QF_LIA/RWS/"
+  , "SMT-LIB-benchmarks/QF_LIA/bofill-scheduling/SMT_random_LIA/"
   , "SMT-LIB-benchmarks/QF_LIA/check/"
   , "SMT-LIB-benchmarks/QF_LIA/calypto/"
   , "SMT-LIB-benchmarks/QF_LIA/cut_lemmas/"
