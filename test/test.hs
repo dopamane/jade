@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
-import Control.Monad (forM, unless)
+import Control.Monad (unless, (<=<))
 import Data.Attoparsec.ByteString.Char8(IResult(Done))
 import qualified Data.ByteString.Builder as B (toLazyByteString)
 import qualified Data.ByteString.Lazy.Char8 as C (unpack)
@@ -14,11 +14,9 @@ import Subpar.Extra.Monad (
   runScript,
   runZ3
   )
-import System.Directory (listDirectory)
+import Subpar.Utility (traverseDirs)
 import System.Exit (exitFailure)
-import System.FilePath ((</>))
-import System.Posix.Files (isDirectory, getFileStatus)
-import System.Process (CreateProcess, readCreateProcess, shell)
+import System.Process (readCreateProcess, shell)
 import Test.HUnit (Test(..), assertEqual, runTestTTAndExit)
 
 main :: IO ()
@@ -27,12 +25,17 @@ main = do
   result <- syntaxTests
   unless result exitFailure
 
-  runTestTTAndExit . TestList . map testBench =<< traverseDirs benchFiles
+  runBenchmarks benchFiles
+
+runBenchmarks :: [FilePath] -> IO ()
+runBenchmarks = runTestTTAndExit . TestList . map testBench <=< traverseDirs
 
 benchFiles :: [FilePath]
 benchFiles =
-  [ "SMT-LIB-benchmarks/QF_LIA/check/"
+  [ "SMT-LIB-benchmarks/QF_LIA/bofill-scheduling/SMT_random_LIA/"
+  , "SMT-LIB-benchmarks/QF_LIA/check/"
   , "SMT-LIB-benchmarks/QF_LIA/calypto/"
+  , "SMT-LIB-benchmarks/QF_LIA/cut_lemmas/"
   , "SMT-LIB-benchmarks/QF_LIA/pidgeons/"
   ]
 {-
@@ -60,21 +63,3 @@ z3Subpar file = do
     Done _ response ->
       C.unpack $ B.toLazyByteString $ unparseGeneralResponse response
     _ -> error "Could not parse response."
-
--- | [StackOverflow](https://stackoverflow.com/a/23822913/4051020)
-traverseDirs :: [FilePath] -> IO [FilePath]
-traverseDirs tops = fmap concat $ forM tops $ \top -> do
-  s <- getFileStatus top
-  if isDirectory s
-    then go top
-    else return [top]
-  where
-    go dir = do
-      ds <- listDirectory dir
-      paths <- forM ds $ \d -> do
-        let path = dir </> d
-        s <- getFileStatus path
-        if isDirectory s
-          then go path
-          else return [path]
-      return $ concat paths
