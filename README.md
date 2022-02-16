@@ -1,4 +1,7 @@
 # subpar :golf:
+
+[![Haskell CI](https://github.com/dopamane/subpar/actions/workflows/haskell.yml/badge.svg?branch=main)](https://github.com/dopamane/subpar/actions/workflows/haskell.yml)
+
 Haskell [SMT](https://smtlib.cs.uiowa.edu/) interface. Under construction. :construction:
 
 ## Build
