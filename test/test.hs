@@ -1,14 +1,17 @@
 {-# LANGUAGE LambdaCase #-}
 
 import Control.Monad (unless, (<=<))
-import Data.Attoparsec.ByteString.Char8(IResult(Done))
-import qualified Data.ByteString.Builder as B (toLazyByteString)
-import qualified Data.ByteString.Lazy.Char8 as C (unpack)
+import Data.Attoparsec.ByteString.Char8(IResult(Done), isSpace)
+import Data.ByteString.Builder (toLazyByteString)
+import qualified Data.ByteString.Char8 as C (filter, readFile)
+import Data.ByteString.Lazy.Char8 (toStrict, unpack)
 import Data.Functor ((<&>))
 import Data.Maybe (catMaybes)
 import Subpar (
+  readScript,
   syntaxTests,
-  unparseGeneralResponse
+  unparseGeneralResponse,
+  unparseScript
   )
 import Subpar.Extra.Monad (
   runScript,
@@ -25,10 +28,14 @@ main = do
   result <- syntaxTests
   unless result exitFailure
 
-  runBenchmarks benchFiles
+  -- runBenchmarks benchFiles
+  runSyntaxBenchmarks benchFiles
 
 runBenchmarks :: [FilePath] -> IO ()
 runBenchmarks = runTestTTAndExit . TestList . map testBench <=< traverseDirs
+
+runSyntaxBenchmarks :: [FilePath] -> IO ()
+runSyntaxBenchmarks = runTestTTAndExit . TestList . map syntaxBench <=< traverseDirs
 
 benchFiles :: [FilePath]
 benchFiles =
@@ -53,6 +60,17 @@ testBench file = TestCase $ do
   actual   <- z3Subpar file
   assertEqual "shell == subpar" expected actual
 
+syntaxBench :: FilePath -> Test
+syntaxBench file = TestCase $ do
+  expected <- removeSpace <$> C.readFile file
+  actual   <- removeSpace . outputScript <$> readScript file
+  assertEqual "original == unparseScript . parseScript" expected actual
+  where
+    removeSpace = C.filter (not . isSpace)
+    outputScript = \case
+      Done _ r -> toStrict $ toLazyByteString $ unparseScript r
+      _ -> error "Could not parse script."
+
 z3Shell :: FilePath -> IO String
 z3Shell file = readCreateProcess z3Process ""
   where
@@ -63,5 +81,5 @@ z3Subpar file = do
   output <- runZ3 $ runScript file
   return $ catMaybes output <&> \case
     Done _ response ->
-      C.unpack $ B.toLazyByteString $ unparseGeneralResponse response
+      unpack $ toLazyByteString $ unparseGeneralResponse response
     _ -> error "Could not parse response."

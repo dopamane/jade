@@ -87,4 +87,5 @@ benchmark bench
   build-depends:    base,
                     criterion,
                     subpar-extra,
+                    subpar-utility
   default-language: Haskell2010

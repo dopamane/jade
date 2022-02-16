@@ -2,9 +2,10 @@ module Main where
 
 import Criterion.Main
 import Subpar.Extra.Monad (runScript, runZ3)
+import Subpar.Utility (traverseDirs)
 
 main :: IO ()
-main = defaultMain $ map benchScript benches
+main = defaultMain . map benchScript =<< traverseDirs benches
 
 benches :: [FilePath]
 benches =
