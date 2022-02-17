@@ -39,13 +39,40 @@ runSyntaxBenchmarks = runTestTTAndExit . TestList . map syntaxBench <=< traverse
 
 benchFiles :: [FilePath]
 benchFiles =
-  [ "SMT-LIB-benchmarks/QF_LIA/RTCL/"
-  , "SMT-LIB-benchmarks/QF_LIA/RWS/"
-  , "SMT-LIB-benchmarks/QF_LIA/bofill-scheduling/SMT_random_LIA/"
-  , "SMT-LIB-benchmarks/QF_LIA/check/"
+  [ "SMT-LIB-benchmarks/QF_LIA/20180326-Bromberger/"
+--  , "SMT-LIB-benchmarks/QF_LIA/2019-cmodelsdiff/boundsmodels/" ERROR
+-- , "SMT-LIB-benchmarks/QF_LIA/2019-cmodelsdiff/hamiltonianCircuit/" ERROR
+--  , "SMT-LIB-benchmarks/QF_LIA/2019-cmodelsdiff/mutualExclusion/" ERROR
+--  , "SMT-LIB-benchmarks/QF_LIA/2019-cmodelsdiff/randomNontight/" ERROR
+--  , "SMT-LIB-benchmarks/QF_LIA/2019-cmodelsdiff/stillLive/" partial LFS
+--  , "SMT-LIB-benchmarks/QF_LIA/2019-cmodelsdiff/wireRouting/" partial LFS
+--  , "SMT-LIB-benchmarks/QF_LIA/2019-ezsmt/incrementalScheduling/" ERROR
+--  , "SMT-LIB-benchmarks/QF_LIA/20210219-Dartagnan/" partial LFS
+  , "SMT-LIB-benchmarks/QF_LIA/Averest/"
+  , "SMT-LIB-benchmarks/QF_LIA/CAV_2009_benchmarks/"
+  , "SMT-LIB-benchmarks/QF_LIA/CIRC/"
+  , "SMT-LIB-benchmarks/QF_LIA/RTCL/"
+--  , "SMT-LIB-benchmarks/QF_LIA/RWS/" ERROR
+  , "SMT-LIB-benchmarks/QF_LIA/arctic-matrix/"
+  , "SMT-LIB-benchmarks/QF_LIA/bofill-scheduling/"
   , "SMT-LIB-benchmarks/QF_LIA/calypto/"
+  , "SMT-LIB-benchmarks/QF_LIA/check/"
+  , "SMT-LIB-benchmarks/QF_LIA/convert/"
   , "SMT-LIB-benchmarks/QF_LIA/cut_lemmas/"
+  , "SMT-LIB-benchmarks/QF_LIA/dillig/"
+  , "SMT-LIB-benchmarks/QF_LIA/fft/"
+  , "SMT-LIB-benchmarks/QF_LIA/mathsat/"
+  , "SMT-LIB-benchmarks/QF_LIA/miplib2003/"
+  , "SMT-LIB-benchmarks/QF_LIA/nec-smt/"
+  , "SMT-LIB-benchmarks/QF_LIA/pb2010/"
   , "SMT-LIB-benchmarks/QF_LIA/pidgeons/"
+  , "SMT-LIB-benchmarks/QF_LIA/prime-cone/"
+  , "SMT-LIB-benchmarks/QF_LIA/rings/"
+  , "SMT-LIB-benchmarks/QF_LIA/rings_preprocessed/"
+  , "SMT-LIB-benchmarks/QF_LIA/slacks/"
+  , "SMT-LIB-benchmarks/QF_LIA/tightrhombus/"
+  , "SMT-LIB-benchmarks/QF_LIA/tropical-matrix/"
+  , "SMT-LIB-benchmarks/QF_LIA/wisa/"
   ]
 {-
   [ -- "SMT-LIB-benchmarks/QF_LIA/20210219-Dartagnan/ConcurrencySafety-Main/45_monabsex1_vs-O0.smt2"
@@ -62,9 +89,10 @@ testBench file = TestCase $ do
 
 syntaxBench :: FilePath -> Test
 syntaxBench file = TestCase $ do
+  let message = file ++ " : original == unparseScript . parseScript"
   expected <- removeSpace <$> C.readFile file
   actual   <- removeSpace . outputScript <$> readScript file
-  assertEqual "original == unparseScript . parseScript" expected actual
+  assertEqual message expected actual
   where
     removeSpace = C.filter (not . isSpace)
     outputScript = \case
