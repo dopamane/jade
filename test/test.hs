@@ -1,9 +1,18 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase               #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
-import Control.Monad (unless, (<=<))
+import Control.Monad (unless)
 import Data.Attoparsec.ByteString.Char8(IResult(Done), isSpace)
 import Data.ByteString.Builder (toLazyByteString)
-import qualified Data.ByteString.Char8 as C (filter, readFile)
+import Data.ByteString.Char8 (ByteString)
+import qualified Data.ByteString.Char8 as C (
+  dropWhile,
+  empty,
+  filter,
+  null,
+  readFile,
+  span
+  )
 import Data.ByteString.Lazy.Char8 (toStrict, unpack)
 import Data.Functor ((<&>))
 import Data.Maybe (catMaybes)
@@ -24,35 +33,38 @@ import Test.HUnit (Test(..), assertEqual, runTestTTAndExit)
 
 main :: IO ()
 main = do
-
   result <- syntaxTests
   unless result exitFailure
+  runTestTTAndExit =<< syntaxBenchmarks benchFiles
 
-  -- runBenchmarks benchFiles
-  runSyntaxBenchmarks benchFiles
+shellBenchmarks :: [FilePath] -> IO Test
+shellBenchmarks = fmap (TestList . map shellBench) . traverseDirs
 
-runBenchmarks :: [FilePath] -> IO ()
-runBenchmarks = runTestTTAndExit . TestList . map testBench <=< traverseDirs
-
-runSyntaxBenchmarks :: [FilePath] -> IO ()
-runSyntaxBenchmarks = runTestTTAndExit . TestList . map syntaxBench <=< traverseDirs
+syntaxBenchmarks :: [FilePath] -> IO Test
+syntaxBenchmarks = fmap (TestList . map syntaxBench) . traverseDirs
 
 benchFiles :: [FilePath]
 benchFiles =
   [ "SMT-LIB-benchmarks/QF_LIA/20180326-Bromberger/"
---  , "SMT-LIB-benchmarks/QF_LIA/2019-cmodelsdiff/boundsmodels/" ERROR
--- , "SMT-LIB-benchmarks/QF_LIA/2019-cmodelsdiff/hamiltonianCircuit/" ERROR
---  , "SMT-LIB-benchmarks/QF_LIA/2019-cmodelsdiff/mutualExclusion/" ERROR
---  , "SMT-LIB-benchmarks/QF_LIA/2019-cmodelsdiff/randomNontight/" ERROR
+  , "SMT-LIB-benchmarks/QF_LIA/2019-cmodelsdiff/boundsmodels/"
+  , "SMT-LIB-benchmarks/QF_LIA/2019-cmodelsdiff/hamiltonianCircuit/"
+--  , "SMT-LIB-benchmarks/QF_LIA/2019-cmodelsdiff/labyrinth/" LFS
+  , "SMT-LIB-benchmarks/QF_LIA/2019-cmodelsdiff/mutualExclusion/"
+  , "SMT-LIB-benchmarks/QF_LIA/2019-cmodelsdiff/randomNontight/"
 --  , "SMT-LIB-benchmarks/QF_LIA/2019-cmodelsdiff/stillLive/" partial LFS
 --  , "SMT-LIB-benchmarks/QF_LIA/2019-cmodelsdiff/wireRouting/" partial LFS
---  , "SMT-LIB-benchmarks/QF_LIA/2019-ezsmt/incrementalScheduling/" ERROR
+--  , "SMT-LIB-benchmarks/QF_LIA/2019-ezsmt/Labyrinth/" LFS
+  , "SMT-LIB-benchmarks/QF_LIA/2019-ezsmt/incrementalScheduling/"
+  , "SMT-LIB-benchmarks/QF_LIA/2019-ezsmt/routingMax/"
+  , "SMT-LIB-benchmarks/QF_LIA/2019-ezsmt/routingMin/"
+  , "SMT-LIB-benchmarks/QF_LIA/2019-ezsmt/travellingSalesperson/"
+  , "SMT-LIB-benchmarks/QF_LIA/2019-ezsmt/weightedSequence/"
 --  , "SMT-LIB-benchmarks/QF_LIA/20210219-Dartagnan/" partial LFS
   , "SMT-LIB-benchmarks/QF_LIA/Averest/"
   , "SMT-LIB-benchmarks/QF_LIA/CAV_2009_benchmarks/"
   , "SMT-LIB-benchmarks/QF_LIA/CIRC/"
   , "SMT-LIB-benchmarks/QF_LIA/RTCL/"
---  , "SMT-LIB-benchmarks/QF_LIA/RWS/" ERROR
+  , "SMT-LIB-benchmarks/QF_LIA/RWS/"
   , "SMT-LIB-benchmarks/QF_LIA/arctic-matrix/"
   , "SMT-LIB-benchmarks/QF_LIA/bofill-scheduling/"
   , "SMT-LIB-benchmarks/QF_LIA/calypto/"
@@ -74,23 +86,18 @@ benchFiles =
   , "SMT-LIB-benchmarks/QF_LIA/tropical-matrix/"
   , "SMT-LIB-benchmarks/QF_LIA/wisa/"
   ]
-{-
-  [ -- "SMT-LIB-benchmarks/QF_LIA/20210219-Dartagnan/ConcurrencySafety-Main/45_monabsex1_vs-O0.smt2"
-  , "SMT-LIB-benchmarks/QF_LIA/convert/convert-jpg2gif-query-1139.smt2"
-  , "SMT-LIB-benchmarks/QF_LIA/cut_lemmas/10-vars/cut_lemma_01_001.smt2"
-  , "SMT-LIB-benchmarks/QF_LIA/mathsat/FISCHER1-1-fair.smt2"
-  ]
--}
-testBench :: FilePath -> Test
-testBench file = TestCase $ do
+
+shellBench :: FilePath -> Test
+shellBench file = TestCase $ do
+  let message = file ++ " : shell == subpar"
   expected <- lines <$> z3Shell file
   actual   <- z3Subpar file
-  assertEqual "shell == subpar" expected actual
+  assertEqual message expected actual
 
 syntaxBench :: FilePath -> Test
 syntaxBench file = TestCase $ do
   let message = file ++ " : original == unparseScript . parseScript"
-  expected <- removeSpace <$> C.readFile file
+  expected <- removeSpace . removeComments <$> C.readFile file
   actual   <- removeSpace . outputScript <$> readScript file
   assertEqual message expected actual
   where
@@ -98,6 +105,16 @@ syntaxBench file = TestCase $ do
     outputScript = \case
       Done _ r -> toStrict $ toLazyByteString $ unparseScript r
       _ -> error "Could not parse script."
+
+removeComments :: ByteString -> ByteString
+removeComments bs
+  | C.null bs = C.empty
+  | otherwise = t <> removeComments d'
+  where
+    (t, d) = C.span (/= ';') bs
+    d' = C.dropWhile isSpace $ C.dropWhile (not . isNewline) d
+      where
+        isNewline ch = ch == '\n' || ch == '\r'
 
 z3Shell :: FilePath -> IO String
 z3Shell file = readCreateProcess z3Process ""
