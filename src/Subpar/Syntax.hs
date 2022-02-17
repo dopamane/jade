@@ -400,6 +400,7 @@ import Data.Attoparsec.ByteString.Char8 (
   choice,
   decimal,
   double,
+  endOfInput,
   endOfLine,
   hexadecimal,
   isAlpha_iso8859_15,
@@ -2852,11 +2853,12 @@ newtype Script = Script{ unScript :: [Command] }
 
 -- | Parse 'Script'
 parseScript :: Parser Script
-parseScript = Script . catMaybes <$> many' parseLine
+parseScript = Script . catMaybes <$> many' parseLine <* endOfInput
   where
     parseLine = choice
       [ Just    <$> parseCommand
       , Nothing <$  skipLineComment
+      , Nothing <$  endOfLine
       ]
 
 -- | Unparse 'Script'
