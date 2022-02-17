@@ -1,8 +1,10 @@
 # subpar :golf:
 
 [![Haskell CI](https://github.com/dopamane/subpar/actions/workflows/haskell.yml/badge.svg?branch=main)](https://github.com/dopamane/subpar/actions/workflows/haskell.yml)
+[![Hackage][hackage-badge]][hackage]
+[![Hackage Dependencies][hackage-deps-badge]][hackage-deps]
 
-Haskell [SMT](https://smtlib.cs.uiowa.edu/) interface. Under construction. :construction:
+Haskell [SMT](https://smtlib.cs.uiowa.edu/) interface.
 
 ## Build
 ```
@@ -86,3 +88,8 @@ writeScript :: FilePath -> Script -> IO ()
 ## References
 
 [SMT-LIB](https://smtlib.cs.uiowa.edu/standard.shtml)
+
+[hackage]:            <https://hackage.haskell.org/package/subpar>
+[hackage-badge]:      <https://img.shields.io/hackage/v/subpar.svg?color=success>
+[hackage-deps-badge]: <https://img.shields.io/hackage-deps/v/subpar.svg>
+[hackage-deps]:       <http://packdeps.haskellers.com/feed?needle=subpar>
