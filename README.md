@@ -75,7 +75,7 @@ send  :: SmtHandle -> Command -> IO ()
 Example:
 ```haskell
 do
-  mapM (xfer smtHandle) [printSuccess, setSmtLibVer, ...] >>= mapM_ printResult
+  mapM (xfer smtHandle) [setOptionPrintSuccess True, setSmtLibVer] >>= mapM_ printResult
   send smtHandle Exit
 ```
 
