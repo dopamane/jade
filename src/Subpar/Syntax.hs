@@ -2228,6 +2228,7 @@ parseFunctionDef = do
   par ')'
   FunctionDef symbol sortedVars <$> parseSort <*> parseTerm
 
+-- | Unparse 'FunctionDef'
 unparseFunctionDef :: FunctionDef -> Builder
 unparseFunctionDef (FunctionDef symbol sortedVars sort term) = unwordsB
   [ unparseSymbol symbol
