@@ -1,8 +1,9 @@
 {-# LANGUAGE LambdaCase               #-}
+{-# LANGUAGE OverloadedStrings        #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 import Control.Monad (unless)
-import Data.Attoparsec.ByteString.Char8(IResult(Done), isSpace)
+import Data.Attoparsec.ByteString.Char8(IResult(Done), isSpace, parseOnly)
 import Data.ByteString.Builder (toLazyByteString)
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as C (
@@ -16,10 +17,21 @@ import qualified Data.ByteString.Char8 as C (
 import Data.ByteString.Lazy.Char8 (toStrict, unpack)
 import Data.Functor ((<&>))
 import Data.Maybe (catMaybes)
+import           Hedgehog hiding (Test)
+import qualified Hedgehog.Gen   as Gen
+import qualified Hedgehog.Range as Range
 import Subpar (
+  Binary(Binary),
+  Hexadecimal(Hexadecimal),
+  Numeral(Numeral),
+  parseBinary,
+  parseHexadecimal,
+  parseNumeral,
   readScript,
-  syntaxTests,
+  unparseBinary,
   unparseGeneralResponse,
+  unparseHexadecimal,
+  unparseNumeral,
   unparseScript
   )
 import Subpar.Extra.Monad (
@@ -36,6 +48,46 @@ main = do
   result <- syntaxTests
   unless result exitFailure
   runTestTTAndExit =<< syntaxBenchmarks benchFiles
+
+---------------------------
+-- Syntax property tests --
+---------------------------
+
+syntaxTests :: IO Bool
+syntaxTests = checkSequential $ Group "syntax properties"
+  [ ("prop_numeral_forward",     prop_numeral_forward)
+  , ("prop_hexadecimal_forward", prop_hexadecimal_forward)
+  , ("prop_binary_forward",      prop_binary_forward)
+  ]
+
+-- | 'parseNumeral' . 'unparseNumeral' == id
+prop_numeral_forward :: Property
+prop_numeral_forward = property $ do
+  n <- forAll $ Gen.integral $ Range.linear 0 (maxBound :: Int)
+  let num   = Numeral $ fromIntegral n
+      numBs = toStrict $ toLazyByteString $ unparseNumeral num
+  parseOnly parseNumeral numBs === Right num
+
+-- | 'parseHexadecimal' . 'unparseHexadecimal' == id
+prop_hexadecimal_forward :: Property
+prop_hexadecimal_forward = property $ do
+  n <- forAll $ Gen.integral $ Range.linear 0 (maxBound :: Int)
+  let hex   = Hexadecimal $ fromIntegral n
+      hexBs = toStrict $ toLazyByteString $ unparseHexadecimal hex
+  parseOnly parseHexadecimal hexBs === Right hex
+
+-- | 'parseBinary' . 'unparseBinary' == id
+prop_binary_forward :: Property
+prop_binary_forward = property $ do
+  n <- forAll $ Gen.integral $ Range.linear 0 (maxBound :: Int)
+  let bin   = Binary $ fromIntegral n
+      binBs = toStrict $ toLazyByteString $ unparseBinary bin
+  parseOnly parseBinary binBs === Right bin
+
+
+----------------------------
+-- Syntax benchmark tests --
+----------------------------
 
 shellBenchmarks :: [FilePath] -> IO Test
 shellBenchmarks = fmap (TestList . map shellBench) . traverseDirs

@@ -22,7 +22,6 @@ library
   build-depends:    attoparsec,
                     base,
                     deepseq,
-                    hedgehog,
                     process,
                     bytestring >= 0.11.2.0,
   hs-source-dirs:   src

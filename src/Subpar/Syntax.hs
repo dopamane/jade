@@ -3,7 +3,6 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData        #-}
-{-# LANGUAGE TemplateHaskell   #-}
 {-|
 Module      : Subpar.Syntax
 Description : SMT-LIB version 2.6 syntax
@@ -389,8 +388,6 @@ module Subpar.Syntax (
     parseGeneralResponse,
     unparseGeneralResponse,
 
-    -- ** Property tests
-    syntaxTests
 ) where
 
 import Control.DeepSeq (NFData)
@@ -408,7 +405,6 @@ import Data.Attoparsec.ByteString.Char8 (
   many',
   many1',
   option,
-  parseOnly,
   peekChar,
   satisfy,
   skipWhile,
@@ -429,18 +425,12 @@ import Data.ByteString.Builder (
   char8,
   doubleDec,
   integerDec,
-  toLazyByteString,
   wordHex
   )
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as C
-import Data.ByteString.Lazy.Char8 (toStrict)
 import GHC.Generics (Generic)
-import           Hedgehog hiding (Command)
-import qualified Hedgehog.Gen   as Gen
-import qualified Hedgehog.Range as Range
 import Prelude hiding (takeWhile)
-
 
 
 -- | unwords for builders; intersperse spaces.
@@ -556,14 +546,6 @@ parseNumeral = do
 unparseNumeral :: Numeral -> Builder
 unparseNumeral = integerDec . unNumeral
 
--- | 'parseNumeral' . 'unparseNumeral' == id
-prop_numeral_forward :: Property
-prop_numeral_forward = property $ do
-  n <- forAll $ Gen.integral $ Range.linear 0 (maxBound :: Int)
-  let num   = Numeral $ fromIntegral n
-      numBs = toStrict $ toLazyByteString $ unparseNumeral num
-  parseOnly parseNumeral numBs === Right num
-
 
 -- | @\<decimal\> ::= \<numeral\>.0*\<numeral\>@
 newtype Decimal = Decimal{ unDecimal :: Double }
@@ -596,14 +578,6 @@ unparseHexadecimal :: Hexadecimal -> Builder
 unparseHexadecimal (Hexadecimal h) =
   byteString "#x" <> wordHex (fromIntegral h)
 
--- | 'parseHexadecimal' . 'unparseHexadecimal' == id
-prop_hexadecimal_forward :: Property
-prop_hexadecimal_forward = property $ do
-  n <- forAll $ Gen.integral $ Range.linear 0 (maxBound :: Int)
-  let hex   = Hexadecimal $ fromIntegral n
-      hexBs = toStrict $ toLazyByteString $ unparseHexadecimal hex
-  parseOnly parseHexadecimal hexBs === Right hex
-
 
 -- | @\<binary\> ::= #b followed by a non-empty sequence of 0 and 1 characters@
 newtype Binary = Binary{ unBinary :: Integer }
@@ -630,14 +604,6 @@ unparseBinary (Binary bin) = byteString "#b" <> encodeBin bin
         go n = let (n', r) = n `divMod` 2
                    b = if r == 1 then '1' else '0'
                in go n' <> char8 b
-
--- | 'parseBinary' . 'unparseBinary' == id
-prop_binary_forward :: Property
-prop_binary_forward = property $ do
-  n <- forAll $ Gen.integral $ Range.linear 0 (maxBound :: Int)
-  let bin   = Binary $ fromIntegral n
-      binBs = toStrict $ toLazyByteString $ unparseBinary bin
-  parseOnly parseBinary binBs === Right bin
 
 
 {- |
@@ -3487,7 +3453,3 @@ unparseGeneralResponse = \case
       , unparseSString str
       , char8 ')'
       ]
-
-
-syntaxTests :: IO Bool
-syntaxTests = checkSequential $$(discover)
