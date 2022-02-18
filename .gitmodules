@@ -1,3 +1,6 @@
 [submodule "SMT-LIB-benchmarks/QF_LIA"]
 	path = SMT-LIB-benchmarks/QF_LIA
 	url = https://clc-gitlab.cs.uiowa.edu:2443/SMT-LIB-benchmarks/QF_LIA
+[submodule "SMT-LIB-benchmarks/QF_LIRA"]
+	path = SMT-LIB-benchmarks/QF_LIRA
+	url = https://clc-gitlab.cs.uiowa.edu:2443/SMT-LIB-benchmarks/QF_LIRA.git

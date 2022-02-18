@@ -2,10 +2,10 @@
 {-# LANGUAGE OverloadedStrings        #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
-import Control.Monad (unless)
+import Control.Monad (forM_, unless)
 import Data.Attoparsec.ByteString.Char8(IResult(Done), isSpace, parseOnly)
 import Data.ByteString.Builder (toLazyByteString)
-import Data.ByteString.Char8 (ByteString)
+import Data.ByteString.Char8 (ByteString, hGetContents)
 import qualified Data.ByteString.Char8 as C (
   dropWhile,
   empty,
@@ -15,6 +15,7 @@ import qualified Data.ByteString.Char8 as C (
   span
   )
 import Data.ByteString.Lazy.Char8 (toStrict, unpack)
+import Data.Function ((&))
 import Data.Functor ((<&>))
 import Data.Maybe (catMaybes)
 import           Hedgehog hiding (Test)
@@ -27,6 +28,7 @@ import Subpar (
   parseBinary,
   parseHexadecimal,
   parseNumeral,
+  parseScript,
   readScript,
   unparseBinary,
   unparseGeneralResponse,
@@ -40,6 +42,7 @@ import Subpar.Extra.Monad (
   )
 import Subpar.Utility (traverseDirs)
 import System.Exit (exitFailure)
+import System.IO (IOMode(ReadMode), withBinaryFile)
 import System.Process (readCreateProcess, shell)
 import Test.HUnit (Test(..), assertEqual, runTestTTAndExit)
 
@@ -95,6 +98,66 @@ shellBenchmarks = fmap (TestList . map shellBench) . traverseDirs
 syntaxBenchmarks :: [FilePath] -> IO Test
 syntaxBenchmarks = fmap (TestList . map syntaxBench) . traverseDirs
 
+
+shellBench :: FilePath -> Test
+shellBench file = TestCase $ do
+  let message = file ++ " : shell == subpar"
+  expected <- lines <$> z3Shell file
+  actual   <- z3Subpar file
+  assertEqual message expected actual
+
+syntaxBench :: FilePath -> Test
+syntaxBench file = TestCase $ do
+  let message = file ++ " : original == unparseScript . parseScript"
+  expected <- removeSpace . removeComments <$> C.readFile file
+  actual   <- removeSpace . outputScript <$> readScript file
+  assertEqual message expected actual
+  where
+    outputScript = \case
+      Done _ r -> toStrict $ toLazyByteString $ unparseScript r
+      _ -> error "Could not parse script."
+
+removeSpace :: ByteString -> ByteString
+removeSpace = C.filter (not . isSpace)
+
+removeComments :: ByteString -> ByteString
+removeComments bs
+  | C.null bs = C.empty
+  | otherwise = t <> removeComments d'
+  where
+    (t, d) = C.span (/= ';') bs
+    d' = C.dropWhile isSpace $ C.dropWhile (not . isNewline) d
+      where
+        isNewline ch = ch == '\n' || ch == '\r'
+
+z3Shell :: FilePath -> IO String
+z3Shell file = readCreateProcess z3Process ""
+  where
+    z3Process = shell $ "z3 -smt2 " ++ file
+
+z3Subpar :: FilePath -> IO [String]
+z3Subpar file = do
+  output <- runZ3 $ runScript file
+  return $ catMaybes output <&> \case
+    Done _ response ->
+      unpack $ toLazyByteString $ unparseGeneralResponse response
+    _ -> error "Could not parse response."
+{-
+-- | Debug: parse 'Script's then display a diff.
+diffScript :: [FilePath] -> IO ()
+diffScript files = forM_ files $ \file ->
+  withBinaryFile file ReadMode $ \hndl -> do
+    contents <- hGetContents hndl
+    let actual = removeSpace $ removeComments contents
+    parseOnly parseScript contents & \case
+      Right script ->
+        let bs = unpack $ toLazyByteString $ unparseScript script
+        in putStrLn $ diff actual bs
+      Left err -> error err
+  where
+    diff :: ByteString -> ByteString -> [ByteString]
+    diff a b = undefined
+-}
 benchFiles :: [FilePath]
 benchFiles =
   [ "SMT-LIB-benchmarks/QF_LIA/20180326-Bromberger/"
@@ -137,46 +200,5 @@ benchFiles =
   , "SMT-LIB-benchmarks/QF_LIA/tightrhombus/"
   , "SMT-LIB-benchmarks/QF_LIA/tropical-matrix/"
   , "SMT-LIB-benchmarks/QF_LIA/wisa/"
+ -- , "SMT-LIB-benchmarks/QF_LIRA/LCTES/" ERROR
   ]
-
-shellBench :: FilePath -> Test
-shellBench file = TestCase $ do
-  let message = file ++ " : shell == subpar"
-  expected <- lines <$> z3Shell file
-  actual   <- z3Subpar file
-  assertEqual message expected actual
-
-syntaxBench :: FilePath -> Test
-syntaxBench file = TestCase $ do
-  let message = file ++ " : original == unparseScript . parseScript"
-  expected <- removeSpace . removeComments <$> C.readFile file
-  actual   <- removeSpace . outputScript <$> readScript file
-  assertEqual message expected actual
-  where
-    removeSpace = C.filter (not . isSpace)
-    outputScript = \case
-      Done _ r -> toStrict $ toLazyByteString $ unparseScript r
-      _ -> error "Could not parse script."
-
-removeComments :: ByteString -> ByteString
-removeComments bs
-  | C.null bs = C.empty
-  | otherwise = t <> removeComments d'
-  where
-    (t, d) = C.span (/= ';') bs
-    d' = C.dropWhile isSpace $ C.dropWhile (not . isNewline) d
-      where
-        isNewline ch = ch == '\n' || ch == '\r'
-
-z3Shell :: FilePath -> IO String
-z3Shell file = readCreateProcess z3Process ""
-  where
-    z3Process = shell $ "z3 -smt2 " ++ file
-
-z3Subpar :: FilePath -> IO [String]
-z3Subpar file = do
-  output <- runZ3 $ runScript file
-  return $ catMaybes output <&> \case
-    Done _ response ->
-      unpack $ toLazyByteString $ unparseGeneralResponse response
-    _ -> error "Could not parse response."
