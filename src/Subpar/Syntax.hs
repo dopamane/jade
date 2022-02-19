@@ -393,6 +393,7 @@ module Subpar.Syntax (
 import Control.DeepSeq (NFData)
 import Data.Attoparsec.ByteString.Char8 (
   Parser,
+  anyChar,
   char,
   choice,
   decimal,
@@ -404,10 +405,11 @@ import Data.Attoparsec.ByteString.Char8 (
   isDigit,
   many',
   many1',
+  manyTill',
   option,
   peekChar,
   satisfy,
-  skipWhile,
+  --skipWhile,
   string,
   takeWhile,
   takeWhile1
@@ -415,7 +417,7 @@ import Data.Attoparsec.ByteString.Char8 (
 import qualified Data.Attoparsec.ByteString.Char8 as C (skipSpace)
 import Data.Bits ((.|.), shiftL)
 import Data.Char (ord)
-import Data.Functor (($>))
+import Data.Functor (void, ($>))
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (catMaybes)
@@ -454,21 +456,15 @@ par p = char p >> skipSpace
 
 -- | Skip inline-comments and spaces
 skipSpace :: Parser ()
-skipSpace = C.skipSpace >> skipInlineComment >> C.skipSpace
-  where
-    skipInlineComment = peekChar >>= \case
-      Just ';' -> skipWhile (not . eol) >> endOfLine
-      _ -> return ()
-      where
-        eol c = c == '\n' || c == '\r'
+skipSpace = C.skipSpace >> void (many' comment) -- skipInlineComment
+--  where
+--    skipInlineComment = peekChar >>= \case
+--      Just ';' -> void $ manyTill' anyChar endOfLine
+--      _ -> return ()
 
--- | Skip line comments
-skipLineComment :: Parser ()
-skipLineComment = do
-  _ <- char ';'
-  skipWhile (not . eol) >> endOfLine
-  where
-    eol c = c == '\n' || c == '\r'
+-- | Parse a comment
+comment :: Parser String
+comment = char ';' *> manyTill' anyChar endOfLine <* C.skipSpace
 
 -- | Reserved words
 newtype Reserved = Reserved{ unReserved :: ByteString }
@@ -550,10 +546,20 @@ unparseNumeral = integerDec . unNumeral
 -- | @\<decimal\> ::= \<numeral\>.0*\<numeral\>@
 newtype Decimal = Decimal{ unDecimal :: Double }
   deriving (Eq, Generic, NFData, Read, Show)
-
+{-
+-- | Convert 'Decimal' to 'Double'.
+decimalValue :: Decimal -> Double
+decimalValue = fromRight 0 . parseOnly (double <* endOfInput) . unDecimal
+-}
 -- | Parse 'Decimal'
 parseDecimal :: Parser Decimal
 parseDecimal = Decimal `fmap` double <* skipSpace
+{-
+parseDecimal = do
+  a <- part1
+  dot <- char '.'
+  zeros <- many' $ char '0'
+-}
 
 -- | Unparse 'Decimal'
 unparseDecimal :: Decimal -> Builder
@@ -2824,7 +2830,7 @@ parseScript = Script . catMaybes <$> many' parseLine <* endOfInput
   where
     parseLine = choice
       [ Just    <$> parseCommand
-      , Nothing <$  skipLineComment
+      , Nothing <$  comment
       , Nothing <$  endOfLine
       ]
 

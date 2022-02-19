@@ -11,14 +11,17 @@ import qualified Data.ByteString.Char8 as C (
   empty,
   filter,
   null,
+  putStrLn,
   readFile,
-  span
+  span,
+  take,
+  uncons
   )
 import Data.ByteString.Lazy.Char8 (toStrict, unpack)
 import Data.Function ((&))
 import Data.Functor ((<&>))
 import Data.Maybe (catMaybes)
-import           Hedgehog hiding (Test)
+import           Hedgehog hiding (Test, diff)
 import qualified Hedgehog.Gen   as Gen
 import qualified Hedgehog.Range as Range
 import Subpar (
@@ -142,7 +145,7 @@ z3Subpar file = do
     Done _ response ->
       unpack $ toLazyByteString $ unparseGeneralResponse response
     _ -> error "Could not parse response."
-{-
+
 -- | Debug: parse 'Script's then display a diff.
 diffScript :: [FilePath] -> IO ()
 diffScript files = forM_ files $ \file ->
@@ -151,13 +154,19 @@ diffScript files = forM_ files $ \file ->
     let actual = removeSpace $ removeComments contents
     parseOnly parseScript contents & \case
       Right script ->
-        let bs = unpack $ toLazyByteString $ unparseScript script
-        in putStrLn $ diff actual bs
+        diff actual $ removeSpace $ toStrict $ toLazyByteString $ unparseScript script
       Left err -> error err
   where
-    diff :: ByteString -> ByteString -> [ByteString]
-    diff a b = undefined
--}
+    diff :: ByteString -> ByteString -> IO ()
+    diff as bs = case (C.uncons as, C.uncons bs) of
+      (Just (a, as'), Just (b, bs'))
+        | a == b    -> diff as' bs'
+        | otherwise -> do
+          putStrLn $ show a ++ " ! " ++ show b
+          C.putStrLn $ C.take 5 as'
+          C.putStrLn $ C.take 6 bs'
+      _ -> return ()
+
 benchFiles :: [FilePath]
 benchFiles =
   [ "SMT-LIB-benchmarks/QF_LIA/20180326-Bromberger/"
