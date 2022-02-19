@@ -3,9 +3,14 @@
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 import Control.Monad (forM_, unless)
-import Data.Attoparsec.ByteString.Char8(IResult(Done), isSpace, parseOnly)
+import Data.Attoparsec.ByteString.Char8 (
+  IResult(Done),
+  endOfInput,
+  isSpace,
+  parseOnly
+  )
 import Data.ByteString.Builder (toLazyByteString)
-import Data.ByteString.Char8 (ByteString, hGetContents)
+import Data.ByteString.Char8 (ByteString, hGetContents, pack)
 import qualified Data.ByteString.Char8 as C (
   dropWhile,
   empty,
@@ -61,9 +66,10 @@ main = do
 
 syntaxTests :: IO Bool
 syntaxTests = checkSequential $ Group "syntax properties"
-  [ ("prop_numeral_forward",     prop_numeral_forward)
-  , ("prop_hexadecimal_forward", prop_hexadecimal_forward)
-  , ("prop_binary_forward",      prop_binary_forward)
+  [ ("prop_numeral_forward",      prop_numeral_forward)
+  , ("prop_hexadecimal_forward",  prop_hexadecimal_forward)
+  , ("prop_hexadecimal_backward", prop_hexadecimal_backward)
+  , ("prop_binary_forward",       prop_binary_forward)
   ]
 
 -- | 'parseNumeral' . 'unparseNumeral' == id
@@ -77,10 +83,20 @@ prop_numeral_forward = property $ do
 -- | 'parseHexadecimal' . 'unparseHexadecimal' == id
 prop_hexadecimal_forward :: Property
 prop_hexadecimal_forward = property $ do
-  n <- forAll $ Gen.integral $ Range.linear 0 (maxBound :: Int)
-  let hex   = Hexadecimal $ fromIntegral n
+  hexStr <- forAll $ Gen.string (Range.linear 1 (1000 :: Int)) Gen.hexit
+  let hex = Hexadecimal $ pack hexStr
       hexBs = toStrict $ toLazyByteString $ unparseHexadecimal hex
   parseOnly parseHexadecimal hexBs === Right hex
+
+-- | 'unparseHexadecimal' . 'parseHexadecimal' == id
+prop_hexadecimal_backward :: Property
+prop_hexadecimal_backward = property $ do
+  hexStr <- forAll $ Gen.string (Range.linear 1 (maxBound :: Int)) Gen.hexit
+  let hexBs = pack $ "#x" <> hexStr
+  case parseOnly (parseHexadecimal <* endOfInput) hexBs of
+    Right r -> let hexBs' = toStrict $ toLazyByteString $ unparseHexadecimal r
+                in hexBs === hexBs'
+    Left err -> error err
 
 -- | 'parseBinary' . 'unparseBinary' == id
 prop_binary_forward :: Property

@@ -30,6 +30,7 @@ module Subpar.Syntax (
 
     -- *** Hexadecimal
     Hexadecimal (..),
+    hexadecimalValue,
     parseHexadecimal,
     unparseHexadecimal,
 
@@ -407,17 +408,17 @@ import Data.Attoparsec.ByteString.Char8 (
   many1',
   manyTill',
   option,
+  parseOnly,
   peekChar,
   satisfy,
-  --skipWhile,
   string,
   takeWhile,
   takeWhile1
   )
 import qualified Data.Attoparsec.ByteString.Char8 as C (skipSpace)
-import Data.Bits ((.|.), shiftL)
+import Data.Bits (Bits, (.|.), shiftL)
 import Data.Char (ord)
-import Data.Functor (void, ($>))
+import Data.Functor (($>))
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (catMaybes)
@@ -426,8 +427,7 @@ import Data.ByteString.Builder (
   byteString, 
   char8,
   doubleDec,
-  integerDec,
-  wordHex
+  integerDec
   )
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as C
@@ -456,11 +456,7 @@ par p = char p >> skipSpace
 
 -- | Skip inline-comments and spaces
 skipSpace :: Parser ()
-skipSpace = C.skipSpace >> void (many' comment) -- skipInlineComment
---  where
---    skipInlineComment = peekChar >>= \case
---      Just ';' -> void $ manyTill' anyChar endOfLine
---      _ -> return ()
+skipSpace = C.skipSpace <* many' comment
 
 -- | Parse a comment
 comment :: Parser String
@@ -572,17 +568,26 @@ unparseDecimal = doubleDec . unDecimal
 letters from A to F, capitalized or not
 @
 -}
-newtype Hexadecimal = Hexadecimal{ unHexadecimal :: Integer }
+newtype Hexadecimal = Hexadecimal{ unHexadecimal :: ByteString }
   deriving (Eq, Generic, NFData, Read, Show)
+
+-- | Convert 'Hexadecimal' to 'Integral'
+hexadecimalValue :: (Integral a, Bits a) => Hexadecimal -> Either String a
+hexadecimalValue = parseOnly (hexadecimal <* endOfInput) . unHexadecimal
 
 -- | Parse 'Hexadecimal'
 parseHexadecimal :: Parser Hexadecimal
-parseHexadecimal = "#x" *> Hexadecimal `fmap` hexadecimal <* skipSpace
+parseHexadecimal =
+  "#x" *> Hexadecimal `fmap` takeWhile1 isHexDigit <* skipSpace
+  where
+    isHexDigit :: Char -> Bool
+    isHexDigit ch =    isDigit ch
+                    || ch >= 'A' && ch <= 'F'
+                    || ch >= 'a' && ch <= 'f'
 
 -- | Unparse 'Hexadecimal'
 unparseHexadecimal :: Hexadecimal -> Builder
-unparseHexadecimal (Hexadecimal h) =
-  byteString "#x" <> wordHex (fromIntegral h)
+unparseHexadecimal (Hexadecimal h) = byteString "#x" <> byteString h
 
 
 -- | @\<binary\> ::= #b followed by a non-empty sequence of 0 and 1 characters@
@@ -769,7 +774,7 @@ specConstantDecimal :: Double -> SpecConstant
 specConstantDecimal = SpecConstantDecimal . Decimal
 
 -- | Construct 'SpecConstantHexadecimal'
-specConstantHexadecimal :: Integer -> SpecConstant
+specConstantHexadecimal :: ByteString -> SpecConstant
 specConstantHexadecimal = SpecConstantHexadecimal . Hexadecimal
 
 -- | Construct 'SpecConstantBinary'
