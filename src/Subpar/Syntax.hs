@@ -20,11 +20,13 @@ module Subpar.Syntax (
 
     -- *** Numeral
     Numeral (..),
+    numeralValue,
     parseNumeral,
     unparseNumeral,
 
     -- *** Decimal
     Decimal (..),
+    decimalValue,
     parseDecimal,
     unparseDecimal,
 
@@ -404,12 +406,13 @@ import Data.Attoparsec.ByteString.Char8 (
   hexadecimal,
   isAlpha_iso8859_15,
   isDigit,
+  isSpace,
   many',
   many1',
   manyTill',
+  notChar,
   option,
   parseOnly,
-  peekChar,
   satisfy,
   string,
   takeWhile,
@@ -425,9 +428,7 @@ import Data.Maybe (catMaybes)
 import Data.ByteString.Builder (
   Builder, 
   byteString, 
-  char8,
-  doubleDec,
-  integerDec
+  char8
   )
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as C
@@ -522,44 +523,63 @@ unparseReserved = byteString . unReserved
 
 
 -- | @\<numeral\> ::= 0 | a non-empty sequence of digits not starting with 0@
-newtype Numeral = Numeral{ unNumeral :: Integer }
+newtype Numeral = Numeral{ unNumeral :: ByteString }
   deriving (Eq, Generic, NFData, Read, Show)
+
+-- | Convert 'Numeral' to 'Integral'
+numeralValue :: Integral a => Numeral -> Either String a
+numeralValue = parseOnly (decimal <* endOfInput) . unNumeral
 
 -- | Parse 'Numeral'
 parseNumeral :: Parser Numeral
-parseNumeral = do
-  dec <- decimal
-  peekChar >>= \case
-    Just '.' -> fail "Numeral cannot contain '.'. Fail to Decimal"
-    _ -> Numeral dec <$ skipSpace
-    
+parseNumeral = Numeral `fmap` parseNumeralByteString <* skipSpace
+
+-- | Parse numeral as bytestring.
+parseNumeralByteString :: Parser ByteString
+{-
+parseNumeralByteString = do
+  d <- digit
+  if d == '0'
+    then return $ C.singleton d
+    else (C.singleton d <>) <$> takeWhile isDigit
+-}
+parseNumeralByteString = choice
+  [ C.singleton <$> char '0'
+  , takeWhile1 isDigit
+  ]
+  where
+--    parseDigits = do
+--      d  <- digit
+--      ds <- takeWhile isDigit
+--      return $ C.singleton d <> ds
+
 
 -- | Unparse 'Numeral'
 unparseNumeral :: Numeral -> Builder
-unparseNumeral = integerDec . unNumeral
+unparseNumeral = byteString . unNumeral
 
 
 -- | @\<decimal\> ::= \<numeral\>.0*\<numeral\>@
-newtype Decimal = Decimal{ unDecimal :: Double }
+newtype Decimal = Decimal{ unDecimal :: ByteString }
   deriving (Eq, Generic, NFData, Read, Show)
-{-
+
 -- | Convert 'Decimal' to 'Double'.
-decimalValue :: Decimal -> Double
-decimalValue = fromRight 0 . parseOnly (double <* endOfInput) . unDecimal
--}
+decimalValue :: Decimal -> Either String Double
+decimalValue = parseOnly (double <* endOfInput) . unDecimal
+
 -- | Parse 'Decimal'
 parseDecimal :: Parser Decimal
-parseDecimal = Decimal `fmap` double <* skipSpace
-{-
+--parseDecimal = Decimal `fmap` double <* skipSpace
 parseDecimal = do
-  a <- part1
-  dot <- char '.'
-  zeros <- many' $ char '0'
--}
+  a     <- parseNumeralByteString
+  _     <- char '.'
+  zeros <- takeWhile (== '0')
+  b     <- parseNumeralByteString <* skipSpace
+  return $ Decimal $ a <> C.singleton '.' <> zeros <> b
 
 -- | Unparse 'Decimal'
 unparseDecimal :: Decimal -> Builder
-unparseDecimal = doubleDec . unDecimal
+unparseDecimal = byteString . unDecimal
 
 
 {- |
@@ -766,11 +786,11 @@ data SpecConstant
   deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Construct 'SpecConstantNumeral'
-specConstantNumeral :: Integer -> SpecConstant
+specConstantNumeral :: ByteString -> SpecConstant
 specConstantNumeral = SpecConstantNumeral . Numeral
 
 -- | Construct 'SpecConstantDecimal'
-specConstantDecimal :: Double -> SpecConstant
+specConstantDecimal :: ByteString -> SpecConstant
 specConstantDecimal = SpecConstantDecimal . Decimal
 
 -- | Construct 'SpecConstantHexadecimal'
@@ -788,8 +808,9 @@ specConstantString = SpecConstantString . SString
 -- | Parse 'SpecConstant'
 parseSpecConstant :: Parser SpecConstant
 parseSpecConstant = choice
-  [ SpecConstantNumeral     <$> parseNumeral
-  , SpecConstantDecimal     <$> parseDecimal -- order matters
+  [ SpecConstantDecimal     <$> parseDecimal
+  , SpecConstantNumeral     <$> parseNumeral
+--  , SpecConstantDecimal     <$> parseDecimal -- order matters
   , SpecConstantHexadecimal <$> parseHexadecimal
   , SpecConstantBinary      <$> parseBinary
   , SpecConstantString      <$> parseSString
@@ -861,7 +882,7 @@ data Index = IndexNumeral Numeral -- ^ \<numeral\>
   deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Construct 'IndexNumeral'
-indexNumeral :: Integer -> Index
+indexNumeral :: ByteString -> Index
 indexNumeral = IndexNumeral . Numeral
 
 -- | Parse 'Index'
@@ -1325,7 +1346,7 @@ data SortSymbolDecl = SortSymbolDecl
 -- | Construct 'SortSymbolDecl'
 sortSymbolDecl ::
   Identifier ->
-  Integer ->
+  ByteString ->
   [Attribute] ->
   SortSymbolDecl
 sortSymbolDecl ident num attrs = SortSymbolDecl
@@ -1924,7 +1945,7 @@ optionProduceUnsatCores :: Bool -> Option
 optionProduceUnsatCores = OptionProduceUnsatCores . BValue
 
 -- | Construct 'OptionRandomSeed'
-optionRandomSeed :: Integer -> Option
+optionRandomSeed :: ByteString -> Option
 optionRandomSeed = OptionRandomSeed . Numeral
 
 -- | Construct 'OptionRegularOutputChannel'
@@ -1932,11 +1953,11 @@ optionRegularOutputChannel :: ByteString -> Option
 optionRegularOutputChannel = OptionRegularOutputChannel . SString
 
 -- | Construct 'OptionReproducibleResourceLimit'
-optionReproducibleResourceLimit :: Integer -> Option
+optionReproducibleResourceLimit :: ByteString -> Option
 optionReproducibleResourceLimit = OptionReproducibleResourceLimit . Numeral
 
 -- | Construct 'OptionVerbosity'
-optionVerbosity :: Integer -> Option
+optionVerbosity :: ByteString -> Option
 optionVerbosity = OptionVerbosity . Numeral
 
 -- | Construct 'OptionAttribute'
@@ -2346,7 +2367,7 @@ data Command
   deriving (Eq, Generic, NFData, Read, Show)
 
 -- | Construct 'DeclareSort'
-declareSort :: Symbol -> Integer -> Command
+declareSort :: Symbol -> ByteString -> Command
 declareSort sym = DeclareSort sym . Numeral
 
 -- | Construct 'DefineFun'
@@ -2366,11 +2387,11 @@ getOption :: ByteString -> Command
 getOption = GetOption . keyword
 
 -- | Construct 'Pop'
-pop :: Integer -> Command
+pop :: ByteString -> Command
 pop = Pop . Numeral
 
 -- | Construct 'Push'
-push :: Integer -> Command
+push :: ByteString -> Command
 push = Push . Numeral
 
 -- | Construct 'SetInfo'
@@ -2418,7 +2439,7 @@ setOptionProduceUnsatCores :: Bool -> Command
 setOptionProduceUnsatCores = SetOption . optionProduceUnsatCores
 
 -- | @( set-option :random-seed \<numeral\> )@
-setOptionRandomSeed :: Integer -> Command
+setOptionRandomSeed :: ByteString -> Command
 setOptionRandomSeed = SetOption . optionRandomSeed
 
 -- | @( set-option :regular-output-channel \<string\> )@
@@ -2426,12 +2447,12 @@ setOptionRegularOutputChannel :: ByteString -> Command
 setOptionRegularOutputChannel = SetOption . optionRegularOutputChannel
 
 -- | @( set-option :reproducible-resource-limit \<numeral\> )@
-setOptionReproducibleResourceLimit :: Integer -> Command
+setOptionReproducibleResourceLimit :: ByteString -> Command
 setOptionReproducibleResourceLimit =
   SetOption . optionReproducibleResourceLimit
 
 -- | @( set-option :verbosity \<numeral\> )@
-setOptionVerbosity :: Integer -> Command
+setOptionVerbosity :: ByteString -> Command
 setOptionVerbosity = SetOption . optionVerbosity
 
 -- | @( set-option \<attribute\> )@
@@ -2831,7 +2852,7 @@ newtype Script = Script{ unScript :: [Command] }
 
 -- | Parse 'Script'
 parseScript :: Parser Script
-parseScript = Script . catMaybes <$> many' parseLine <* endOfInput
+parseScript = Script . catMaybes <$> many1' parseLine <* endOfInput
   where
     parseLine = choice
       [ Just    <$> parseCommand

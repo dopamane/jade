@@ -15,6 +15,8 @@ import qualified Data.ByteString.Char8 as C (
   dropWhile,
   empty,
   filter,
+  head,
+  length,
   null,
   putStrLn,
   readFile,
@@ -75,24 +77,29 @@ syntaxTests = checkSequential $ Group "syntax properties"
 -- | 'parseNumeral' . 'unparseNumeral' == id
 prop_numeral_forward :: Property
 prop_numeral_forward = property $ do
-  n <- forAll $ Gen.integral $ Range.linear 0 (maxBound :: Int)
-  let num   = Numeral $ fromIntegral n
+  nBs <- forAll $ Gen.filter properNumerals $ Gen.utf8 (Range.linear 1 (100 :: Int)) Gen.digit
+  let num   = Numeral nBs
       numBs = toStrict $ toLazyByteString $ unparseNumeral num
   parseOnly parseNumeral numBs === Right num
+  where
+    properNumerals :: ByteString -> Bool
+    properNumerals bs =
+         C.length bs == 1
+      || C.length bs >  1 && C.head bs /= '0'
 
 -- | 'parseHexadecimal' . 'unparseHexadecimal' == id
 prop_hexadecimal_forward :: Property
 prop_hexadecimal_forward = property $ do
-  hexStr <- forAll $ Gen.string (Range.linear 1 (1000 :: Int)) Gen.hexit
-  let hex = Hexadecimal $ pack hexStr
-      hexBs = toStrict $ toLazyByteString $ unparseHexadecimal hex
-  parseOnly parseHexadecimal hexBs === Right hex
+  hexBs <- forAll $ Gen.utf8 (Range.linear 1 (100 :: Int)) Gen.hexit
+  let hex = Hexadecimal hexBs
+      hexBs' = toStrict $ toLazyByteString $ unparseHexadecimal hex
+  parseOnly (parseHexadecimal <* endOfInput) hexBs' === Right hex
 
 -- | 'unparseHexadecimal' . 'parseHexadecimal' == id
 prop_hexadecimal_backward :: Property
 prop_hexadecimal_backward = property $ do
-  hexStr <- forAll $ Gen.string (Range.linear 1 (maxBound :: Int)) Gen.hexit
-  let hexBs = pack $ "#x" <> hexStr
+  hexStr <- forAll $ Gen.utf8 (Range.linear 1 (100 :: Int)) Gen.hexit
+  let hexBs = "#x" <> hexStr
   case parseOnly (parseHexadecimal <* endOfInput) hexBs of
     Right r -> let hexBs' = toStrict $ toLazyByteString $ unparseHexadecimal r
                 in hexBs === hexBs'
