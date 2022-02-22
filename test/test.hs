@@ -203,7 +203,11 @@ diffScript files = forM_ files $ \file ->
 
 benchFiles :: [FilePath]
 benchFiles =
-  [ "SMT-LIB-benchmarks/QF_LIA/20180326-Bromberger/"
+  [ "SMT-LIB-benchmarks/LIA/20190429-UltimateAutomizerSvcomp2019/"
+  , "SMT-LIB-benchmarks/LIA/UltimateAutomizer/"
+  , "SMT-LIB-benchmarks/LIA/psyco/"
+  , "SMT-LIB-benchmarks/LIA/tptp/"
+  , "SMT-LIB-benchmarks/QF_LIA/20180326-Bromberger/"
   , "SMT-LIB-benchmarks/QF_LIA/2019-cmodelsdiff/boundsmodels/"
   , "SMT-LIB-benchmarks/QF_LIA/2019-cmodelsdiff/hamiltonianCircuit/"
 --  , "SMT-LIB-benchmarks/QF_LIA/2019-cmodelsdiff/labyrinth/" LFS
@@ -243,5 +247,5 @@ benchFiles =
   , "SMT-LIB-benchmarks/QF_LIA/tightrhombus/"
   , "SMT-LIB-benchmarks/QF_LIA/tropical-matrix/"
   , "SMT-LIB-benchmarks/QF_LIA/wisa/"
- -- , "SMT-LIB-benchmarks/QF_LIRA/LCTES/" ERROR
+--  , "SMT-LIB-benchmarks/QF_LIRA/LCTES/" Error
   ]
