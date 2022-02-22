@@ -10,7 +10,7 @@ import Data.Attoparsec.ByteString.Char8 (
   parseOnly
   )
 import Data.ByteString.Builder (toLazyByteString)
-import Data.ByteString.Char8 (ByteString, hGetContents, pack)
+import Data.ByteString.Char8 (ByteString, hGetContents)
 import qualified Data.ByteString.Char8 as C (
   dropWhile,
   empty,
@@ -18,6 +18,7 @@ import qualified Data.ByteString.Char8 as C (
   head,
   length,
   null,
+  pack,
   putStrLn,
   readFile,
   span,
@@ -69,6 +70,7 @@ main = do
 syntaxTests :: IO Bool
 syntaxTests = checkSequential $ Group "syntax properties"
   [ ("prop_numeral_forward",      prop_numeral_forward)
+  , ("prop_numeral_backward",     prop_numeral_backward)
   , ("prop_hexadecimal_forward",  prop_hexadecimal_forward)
   , ("prop_hexadecimal_backward", prop_hexadecimal_backward)
   , ("prop_binary_forward",       prop_binary_forward)
@@ -84,8 +86,17 @@ prop_numeral_forward = property $ do
   where
     properNumerals :: ByteString -> Bool
     properNumerals bs =
-         C.length bs == 1
-      || C.length bs >  1 && C.head bs /= '0'
+      C.length bs == 1 || C.length bs >  1 && C.head bs /= '0'
+
+-- | 'unparseNumeral' . 'parseNumeral' == id
+prop_numeral_backward :: Property
+prop_numeral_backward = property $ do
+  n <- forAll $ Gen.int (Range.linear 0 (maxBound :: Int))
+  let numBs = C.pack $ show n
+  case parseOnly (parseNumeral <* endOfInput) numBs of
+    Right r -> let numBs' = toStrict $ toLazyByteString $ unparseNumeral r
+               in numBs === numBs'
+    Left err -> error err
 
 -- | 'parseHexadecimal' . 'unparseHexadecimal' == id
 prop_hexadecimal_forward :: Property

@@ -406,11 +406,9 @@ import Data.Attoparsec.ByteString.Char8 (
   hexadecimal,
   isAlpha_iso8859_15,
   isDigit,
-  isSpace,
   many',
   many1',
   manyTill',
-  notChar,
   option,
   parseOnly,
   satisfy,
@@ -536,23 +534,10 @@ parseNumeral = Numeral `fmap` parseNumeralByteString <* skipSpace
 
 -- | Parse numeral as bytestring.
 parseNumeralByteString :: Parser ByteString
-{-
-parseNumeralByteString = do
-  d <- digit
-  if d == '0'
-    then return $ C.singleton d
-    else (C.singleton d <>) <$> takeWhile isDigit
--}
 parseNumeralByteString = choice
   [ C.singleton <$> char '0'
   , takeWhile1 isDigit
   ]
-  where
---    parseDigits = do
---      d  <- digit
---      ds <- takeWhile isDigit
---      return $ C.singleton d <> ds
-
 
 -- | Unparse 'Numeral'
 unparseNumeral :: Numeral -> Builder
@@ -569,7 +554,6 @@ decimalValue = parseOnly (double <* endOfInput) . unDecimal
 
 -- | Parse 'Decimal'
 parseDecimal :: Parser Decimal
---parseDecimal = Decimal `fmap` double <* skipSpace
 parseDecimal = do
   a     <- parseNumeralByteString
   _     <- char '.'
@@ -808,9 +792,8 @@ specConstantString = SpecConstantString . SString
 -- | Parse 'SpecConstant'
 parseSpecConstant :: Parser SpecConstant
 parseSpecConstant = choice
-  [ SpecConstantDecimal     <$> parseDecimal
+  [ SpecConstantDecimal     <$> parseDecimal -- order matters
   , SpecConstantNumeral     <$> parseNumeral
---  , SpecConstantDecimal     <$> parseDecimal -- order matters
   , SpecConstantHexadecimal <$> parseHexadecimal
   , SpecConstantBinary      <$> parseBinary
   , SpecConstantString      <$> parseSString
