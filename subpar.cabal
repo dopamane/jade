@@ -7,7 +7,7 @@ bug-reports:        https://github.com/dopamane/subpar/issues
 license:            BSD-3-Clause
 author:             dopamane
 maintainer:         dwc1295@gmail.com
-copyright:          David Cox 2022
+copyright:          David Cox 2022-2024
 category:           SMT, Formal Methods, Theorem Provers, Math, System
 extra-source-files: CHANGELOG.md
 

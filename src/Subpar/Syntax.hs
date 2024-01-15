@@ -673,23 +673,8 @@ parseSimpleSymbol = do
   return $ SimpleSymbol $ c `C.cons` cs
   where
     isSimpleChar c = isDigit c || isAlpha_iso8859_15 c || isSpecial c
-    isSpecial c =    c == '+'
-                  || c == '-'
-                  || c == '/'
-                  || c == '*'
-                  || c == '='
-                  || c == '%'
-                  || c == '?'
-                  || c == '!'
-                  || c == '.'
-                  || c == '$'
-                  || c == '_'
-                  || c == '~'
-                  || c == '^'
-                  || c == '<'
-                  || c == '>'
-                  || c == '@'
-                  
+    isSpecial = flip C.elem "+-/*=%?!.$_~^<>@"
+
 -- | Unparse 'SimpleSymbol'
 unparseSimpleSymbol :: SimpleSymbol -> Builder
 unparseSimpleSymbol = byteString . unSimpleSymbol
