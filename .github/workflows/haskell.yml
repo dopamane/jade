@@ -5,6 +5,8 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  schedule:
+    - cron: '0 0 * * *'
 
 jobs:
   build:
@@ -47,7 +49,7 @@ jobs:
         key: ${{ steps.cache.outputs.cache-primary-key }}
 
     - name: install z3
-      run: apt-get install z3
+      run: sudo apt-get install z3
 
     - name: build
       run: cabal build all
